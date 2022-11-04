@@ -1,0 +1,16 @@
+[
+    {
+        "model": "Persona.roles",
+        "pk": 1,
+        "fields": {
+            "nombre": "Tutor"
+        }
+    },
+    {
+        "model": "Persona.roles",
+        "pk": 2,
+        "fields": {
+            "nombre": "Supervisado"
+        }
+    }
+]

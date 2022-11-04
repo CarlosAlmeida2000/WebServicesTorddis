@@ -13,12 +13,12 @@ import os
 class Monitorizar:
     def __init__(self):
         # atributos generales 
-        self.dataTrained = 'media\\Perfiles\\Trained'
-        self.rutaModelos = 'Monitoreo\\trained_model\\'
-        self.custodiadosReconocer = []
+        self.rostros_entrena = 'media\\Perfiles\\Entrenados'
+        self.ruta_modelos = 'Monitoreo\\Modelo_entrenado\\'
+        self.lista_supervisados = []
         self.expresionFacial = ''
         self.imagenExpresion = None
-        self.custodiado = Custodiados()
+        self.custodiado = Supervisados()
         self.minutosDeteccion = 1
         self.byte = bytes()
         # Construcción de la red neuronal convolucional
@@ -65,12 +65,12 @@ class Monitorizar:
         # cargar el clasificador de detección de rostros pre entrenado de OpenCV
         self.faceClassif = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         # cargar el modelo entrenado para reconocer expresiones faciales
-        self.model.load_weights(self.rutaModelos + 'model.h5')
+        self.model.load_weights(self.ruta_modelos + 'model.h5')
         # cargar el modelo para el reconocimiento facial: El reconocimiento facial se realiza mediante el clasificador de distancia y vecino más cercano
         self.face_recognizer = cv2.face.LBPHFaceRecognizer_create()
-        self.face_recognizer.read(self.rutaModelos + 'modeloLBPHFace.xml')
+        self.face_recognizer.read(self.ruta_modelos + 'modeloLBPHFace.xml')
         # se obtine la lista de personas a reconocer
-        self.custodiadosReconocer = os.listdir(self.dataTrained)
+        self.lista_supervisados = os.listdir(self.rostros_entrena)
     
     # se registra el historial de la persona
     def guardarHistorial(self):
@@ -123,7 +123,7 @@ class Monitorizar:
                             cv2.putText(video,'{}'.format(persona_identif),(x, y - 5),1,1.3,(255, 255, 0), 1, cv2.LINE_AA)
                             # se verifica si es la persona
                             if persona_identif[1] < 70:
-                                self.custodiado = Custodiados.objects.filter(persona_id = self.custodiadosReconocer[persona_identif[0]]).select_related('persona')
+                                self.custodiado = Supervisados.objects.filter(persona_id = self.lista_supervisados[persona_identif[0]]).select_related('persona')
                                 if(len(self.custodiado)):
                                     cv2.putText(video,'{}'.format(self.custodiado[0].persona.nombres),(x, y - 25), 2, 1.1,(0, 255, 0),1,cv2.LINE_AA)
                                     cv2.rectangle(video, (x, y),(x + w,y + h),(0, 255, 0), 2)

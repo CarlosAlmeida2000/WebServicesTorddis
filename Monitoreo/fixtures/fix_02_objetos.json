@@ -1,0 +1,128 @@
+[
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 1,
+        "fields": {
+            "nombre": "audifono"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 2,
+        "fields": {
+            "nombre": "borrador"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 3,
+        "fields": {
+            "nombre": "botella"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 4,
+        "fields": {
+            "nombre": "celular"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 5,
+        "fields": {
+            "nombre": "cuaderno"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 6,
+        "fields": {
+            "nombre": "estilete"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 7,
+        "fields": {
+            "nombre": "goma"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 8,
+        "fields": {
+            "nombre": "lapicero"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 9,
+        "fields": {
+            "nombre": "lapiz"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 10,
+        "fields": {
+            "nombre": "laptop"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 11,
+        "fields": {
+            "nombre": "lente"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 12,
+        "fields": {
+            "nombre": "mochila"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 13,
+        "fields": {
+            "nombre": "plato"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 14,
+        "fields": {
+            "nombre": "regla"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 15,
+        "fields": {
+            "nombre": "sacapunta"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 16,
+        "fields": {
+            "nombre": "tijera"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 17,
+        "fields": {
+            "nombre": "usb"
+        }
+    },
+    {
+        "model": "Monitoreo.objetos",
+        "pk": 18,
+        "fields": {
+            "nombre": "vaso"
+        }
+    }
+]

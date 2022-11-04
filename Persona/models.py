@@ -78,8 +78,8 @@ class Tutores(models.Model):
                 tutores = (Tutores.objects.all().select_related('persona')).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
                 tutores = tutores.filter(nombres_completos__icontains = request.GET['nombres_apellidos'])
             else:
-                tutores = tutores.objects.all()
-            tutores = tutores.order_by('usuario').select_related('persona').values('id', 'usuario', 
+                tutores = Tutores.objects.all()
+            tutores = tutores.order_by('usuario').select_related('persona').values('id', 'usuario', 'correo',
                 'persona_id','persona__nombres', 'persona__apellidos', 'persona__cedula', 'persona__fecha_nacimiento', 'persona__foto_perfil')
             file = Image()
             for u in range(len(tutores)):

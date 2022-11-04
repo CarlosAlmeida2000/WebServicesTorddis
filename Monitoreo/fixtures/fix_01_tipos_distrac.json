@@ -1,0 +1,30 @@
+[
+    {
+        "model": "Monitoreo.tiposdistraccion",
+        "pk": 1,
+        "fields": {
+            "nombre": "Reconocer objetos"
+        }
+    },
+    {
+        "model": "Monitoreo.tiposdistraccion",
+        "pk": 2,
+        "fields": {
+            "nombre": "Reconocer personas"
+        }
+    },
+    {
+        "model": "Monitoreo.tiposdistraccion",
+        "pk": 3,
+        "fields": {
+            "nombre": "Reconocer expresiones"
+        }
+    },
+    {
+        "model": "Monitoreo.tiposdistraccion",
+        "pk": 4,
+        "fields": {
+            "nombre": "Detectar sueño"
+        }
+    }
+]
