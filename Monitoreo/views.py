@@ -1,9 +1,8 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from Monitoreo.reconocimiento import Monitorizar
 from Monitoreo.entrenamiento_facial import EntrenamientoFacial
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from .models import *
-import json, threading
+import json
 
 # Create your views here.
 class vwCamara(APIView):
@@ -28,7 +27,7 @@ class vwCamara(APIView):
         if request.method == 'PUT':
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
-                camara = Camaras.objects.get(pk = request.GET['id'])
+                camara = Camaras.objects.get(pk = json_data['id'])
                 return Response({'camara': camara.guardar(json_data)})
             except Exception as e: 
                 return Response({'camara': 'error'})
@@ -36,7 +35,12 @@ class vwCamara(APIView):
     def delete(self, request, format = None):
         if request.method == 'DELETE':
             try:
-                camara = Camaras.objects.get(pk = request.GET['id'])
+                if 'id' in request.GET:
+                    camara = Camaras.objects.get(pk = request.GET['id'])
+                elif 'direccion_ip' in request.GET:
+                    camara = Camaras.objects.get(direccion_ip = request.GET['direccion_ip'])
+                elif 'nombre_camara' in request.GET:
+                    camara = Camaras.objects.get(nombre_camara = request.GET['nombre_camara'])
                 camara.delete()
                 return Response({'camara': 'eliminada'})
             except Camaras.DoesNotExist:
@@ -88,9 +92,6 @@ class vwPermisosObjetos(APIView):
                 return Response({'camara': 'error'})
 
 class vwConfiguracion(APIView):
-    def __init__(self):
-        self.monitoreo = Monitorizar()
-
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
@@ -104,6 +105,14 @@ class vwConfiguracion(APIView):
                 json_data = json.loads(request.body.decode('utf-8'))
                 monitoreo = Monitoreo()
                 return Response({'monitoreo': monitoreo.activar(json_data)})
+            except Exception as e: 
+                return Response({'monitoreo': 'error'})
+
+    def put(self, request, format = None):
+        if request.method == 'PUT':
+            try:
+                json_data = json.loads(request.body.decode('utf-8'))
+                return Response({'monitoreo': Monitoreo.start()})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 

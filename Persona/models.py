@@ -12,7 +12,7 @@ import os
 
 # Create your models here.
 class Roles(models.Model):
-    nombre = models.CharField(max_length = 10)
+    nombre = models.CharField(max_length = 15)
 
 class Personas(models.Model):
     nombres = models.CharField(max_length = 40)

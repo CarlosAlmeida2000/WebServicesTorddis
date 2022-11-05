@@ -1,9 +1,11 @@
-from django.db import models
-from django.db import transaction
-from django.db.models import Q, Value, BooleanField
-from django.db.models.functions import Concat
+from django.db.models import Q, Value, BooleanField, IntegerField
+from Monitoreo.reconocimiento import Monitorizar
 from Persona.models import Supervisados, Tutores
+from django.db.models.functions import Concat
+from django.db import transaction
 from Persona.image import Image
+from django.db import models
+import threading
 
 # Create your models here.
 class TiposDistraccion(models.Model):
@@ -62,30 +64,36 @@ class PermisosObjetos(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            objetos = Objetos.objects.all().annotate(habilitado = Value(False, output_field = BooleanField()))
-            permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
-            for obj in objetos:
-                if(len(permisos_obj.filter(tipos_distraccion_id = obj.pk))):
-                    ## MIRAR ESTA ASIGNACIÓN
-                    obj.habilitado = True
-            return list(objetos)
+            if 'permiso_objeto_id' in request.GET:
+                return list(PermisosObjetos.objects.filter(pk = request.GET['permiso_objeto_id']).values())
+            elif 'tutor_id' in request.GET:
+                objetos = Objetos.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
+                permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
+                for i in range(len(objetos)):
+                    permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
+                    if(len(permiso)):
+                        print(permiso)
+                        ## MIRAR ESTA ASIGNACIÓN
+                        objetos[i]['habilitado'] = True
+                        objetos[i]['permiso_objeto_id'] = permiso[0].id
+                return list(objetos)
         except Exception as e: 
             return 'error'
 
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if 'tutor_id' in json_data and 'objeto_id' in json_data:
+            if 'id' in json_data and 'tutor_id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.objeto = Objetos.objects.get(pk = json_data['objeto_id'])
+                self.objeto = Objetos.objects.get(pk = json_data['id'])
                 self.save()
             return 'guardado'
         except Tutores.DoesNotExist or Objetos.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error'+str(e)
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error'+str(e)
     
     def desactivar(self, permiso_objeto_id):
         punto_guardado = transaction.savepoint()
@@ -116,6 +124,19 @@ class Monitoreo(models.Model):
             return list(tipos_distraccion)
         except Exception as e: 
             return 'error'
+    
+    @staticmethod
+    def start():
+        monitoreo = Monitorizar()
+        hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
+        hilo_vigilar.start()
+        # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA
+            # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
+            #     monitoreo = Monitorizar()
+            #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
+            #     hilo_vigilar.start()
+        return 'monitoreando........'
+
 
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
@@ -124,12 +145,7 @@ class Monitoreo(models.Model):
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
                 self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_distraccion_id'])
                 self.save()
-
-                # INICIA LA MONITORIZACIÓN, CREANDO HILOS POR CADA CAMARA HABILITADA DEL TUTOR
-                #
-                #
-
-            return 'guardado'
+            return 'activado'
         except Tutores.DoesNotExist or TiposDistraccion.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -142,7 +158,7 @@ class Monitoreo(models.Model):
         try:
             monitoreo = Monitoreo.objects.get(pk = monitoreo_id)
             monitoreo.delete()
-            return 'eliminado'
+            return 'desactivado'
         except Monitoreo.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -153,6 +169,7 @@ class Monitoreo(models.Model):
 class Historial(models.Model):
     fecha_hora = models.DateTimeField()
     imagen_evidencia = models.ImageField(upload_to = 'Evidencias', null = True, blank = True)
+    observacion = models.CharField(max_length = 200)
     supervisado = models.ForeignKey('Persona.Supervisados', on_delete = models.PROTECT, related_name = "historial_supervisado")
     tipo_distraccion = models.ForeignKey('Monitoreo.TiposDistraccion', on_delete = models.PROTECT, related_name = "historial_distraccion")
 
@@ -213,13 +230,13 @@ class Historial(models.Model):
                     'supervisado__persona__nombres': supervisado.persona.nombres,
                     'supervisado__persona__apellidos': supervisado.persona.apellidos,
                     'supervisado__persona__cedula': supervisado.persona.cedula,
-                    'enfadado': (historial.filter(expresion_facial = 'Angry').count()),
-                    'asqueado': (historial.filter(expresion_facial = 'Disgusted').count()),
-                    'temeroso': (historial.filter(expresion_facial = 'Afraid').count()),
-                    'feliz': (historial.filter(expresion_facial = 'Happy').count()),
+                    'enfadado': (historial.filter(expresion_facial = 'Enfadado').count()),
+                    'asqueado': (historial.filter(expresion_facial = 'Asqueado').count()),
+                    'temeroso': (historial.filter(expresion_facial = 'Temeroso').count()),
+                    'feliz': (historial.filter(expresion_facial = 'Feliz').count()),
                     'neutral': (historial.filter(expresion_facial = 'Neutral').count()),
-                    'triste': (historial.filter(expresion_facial = 'Sad').count()),
-                    'sorprendido': (historial.filter(expresion_facial = 'Surprised').count())
+                    'triste': (historial.filter(expresion_facial = 'Triste').count()),
+                    'sorprendido': (historial.filter(expresion_facial = 'Sorprendido').count())
                     }
                     historial_grafico.append(object_json)
             return historial_grafico
