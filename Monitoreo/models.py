@@ -64,16 +64,21 @@ class PermisosObjetos(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'permiso_objeto_id' in request.GET:
-                return list(PermisosObjetos.objects.filter(pk = request.GET['permiso_objeto_id']).values())
+            if 'tutor_id' in request.GET and 'id' in request.GET:
+                objetos = Objetos.objects.filter(pk = request.GET['id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
+                permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
+                for i in range(len(objetos)):
+                    permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
+                    if(len(permiso)):
+                        objetos[i]['habilitado'] = True
+                        objetos[i]['permiso_objeto_id'] = permiso[0].id
+                return list(objetos)
             elif 'tutor_id' in request.GET:
                 objetos = Objetos.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
                 for i in range(len(objetos)):
                     permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
                     if(len(permiso)):
-                        print(permiso)
-                        ## MIRAR ESTA ASIGNACIÓN
                         objetos[i]['habilitado'] = True
                         objetos[i]['permiso_objeto_id'] = permiso[0].id
                 return list(objetos)
@@ -87,23 +92,23 @@ class PermisosObjetos(models.Model):
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
                 self.objeto = Objetos.objects.get(pk = json_data['id'])
                 self.save()
-            return 'guardado'
+                return 'guardado'
+            return 'error'
         except Tutores.DoesNotExist or Objetos.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
     
-    def desactivar(self, permiso_objeto_id):
+    def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            permiso_objeto = PermisosObjetos.objects.get(pk = permiso_objeto_id)
-            permiso_objeto.delete()
-            return 'eliminado'
-        except PermisosObjetos.DoesNotExist:
-            transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            self = PermisosObjetos.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(objeto_id = request.GET['id']))
+            if(len(self)):
+                self[0].delete()
+                return 'eliminado'
+            return 'el objeto no tiene un permiso'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -115,53 +120,68 @@ class Monitoreo(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            tipos_distraccion = TiposDistraccion.objects.all().annotate(habilitado = Value(False, output_field = BooleanField()))
-            monitoreo = Monitoreo.objects.filter(tutor_id = request.GET['tutor_id'])
-            for tipo in tipos_distraccion:
-                if(len(monitoreo.filter(tipos_distraccion_id = tipo.pk))):
-                    ## MIRAR ESTA ASIGNACIÓN
-                    tipo.habilitado = True
-            return list(tipos_distraccion)
+            if 'tutor_id' in request.GET and 'id' in request.GET:
+                tipos_distraccion = TiposDistraccion.objects.filter(pk = request.GET['id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(tipo_distraccion_id = Value(0, output_field = IntegerField())).values()
+                monitoreo_dis = Monitoreo.objects.filter(tutor_id = request.GET['tutor_id'])
+                for i in range(len(tipos_distraccion)):
+                    monitoreo = monitoreo_dis.filter(tipo_distraccion_id = tipos_distraccion[i]['id'])
+                    if(len(monitoreo)):
+                        tipos_distraccion[i]['habilitado'] = True
+                        tipos_distraccion[i]['tipo_distraccion_id'] = monitoreo[0].id
+                return list(tipos_distraccion)
+            elif 'tutor_id' in request.GET:
+                tipos_distraccion = TiposDistraccion.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(tipo_distraccion_id = Value(0, output_field = IntegerField())).values()
+                monitoreo_dis = Monitoreo.objects.filter(tutor_id = request.GET['tutor_id'])
+                for i in range(len(tipos_distraccion)):
+                    monitoreo = monitoreo_dis.filter(tipo_distraccion_id = tipos_distraccion[i]['id'])
+                    if(len(monitoreo)):
+                        tipos_distraccion[i]['habilitado'] = True
+                        tipos_distraccion[i]['tipo_distraccion_id'] = monitoreo[0].id
+                return list(tipos_distraccion)
         except Exception as e: 
             return 'error'
+
     
     @staticmethod
     def start():
-        monitoreo = Monitorizar()
-        hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
-        hilo_vigilar.start()
-        # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA
-            # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
-            #     monitoreo = Monitorizar()
-            #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
-            #     hilo_vigilar.start()
-        return 'monitoreando........'
+        try:
+            monitoreo = Monitorizar()
+            hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
+            hilo_vigilar.start()
+            # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA 
+                # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
+                #     monitoreo = Monitorizar()
+                #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
+                #     hilo_vigilar.start()
+            return 'monitoreando........'
+        except Exception as e: 
+            return 'error2 '+str(e)
 
 
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if 'tutor_id' in json_data and 'tipo_distraccion_id' in json_data:
+            if 'tutor_id' in json_data and 'id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_distraccion_id'])
+                self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['id'])
                 self.save()
-            return 'activado'
+                return 'activado'
+            return 'error'
         except Tutores.DoesNotExist or TiposDistraccion.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error' 
     
-    def desactivar(self, monitoreo_id):
+    def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            monitoreo = Monitoreo.objects.get(pk = monitoreo_id)
-            monitoreo.delete()
-            return 'desactivado'
-        except Monitoreo.DoesNotExist:
-            transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            self = Monitoreo.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['id']))
+            if(len(self)):
+                self[0].delete()
+                return 'desactivado'
+            return 'el tipo de distracción no está activado'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'

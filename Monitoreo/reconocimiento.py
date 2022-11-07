@@ -18,12 +18,13 @@ class Monitorizar:
     # 4. Reconocer objetos
     def __init__(self):
         # atributos generales 
+
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
         self.lista_supervisados = []
         self.imagen_evidencia = None
-        self.supervisado = Supervisados()
-        self.tipo_distraccion = TiposDistraccion()
+        self.supervisado = None
+        self.tipo_distraccion = None
         self.minutos_deteccion = 1
         self.byte = bytes()
 
@@ -163,8 +164,6 @@ class Monitorizar:
                             if resultados.multi_face_landmarks: # existe un rostro
                                 for r in resultados.multi_face_landmarks:
 
-                                    print(type(r))
-
                                     self.mpDibujo.draw_landmarks(video, r, self.mpMallaFacial.FACEMESH_CONTOURS, self.ConfDibu, self.ConfDibu)
                                     # extraer los puntos del rostro detectado
                                     for id, puntos in enumerate(r.landmark):
@@ -182,25 +181,25 @@ class Monitorizar:
                                             x4, y4 = self.puntos_faciales[386][1:]
                                             cx2, cy2 = (x3 + x4) // 2, (y3 + y4) // 2
                                             longitud2 = math.hypot(x4 - x3, y4 -y3)
-                                            cv2.putText(video, f'Parpadeos: {int(cant_parpadeos)}', (300, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                                            cv2.putText(video, f'Micro sueno: {int(micro_sueno)}', (780, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                                            cv2.putText(video, f'Duracion: {int(duracion_sueno)}', (550, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                                            cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                                            cv2.putText(video, f'Micro sueno: {int(self.micro_sueno)}', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                            cv2.putText(video, f'Duracion: {int(self.duracion_sueno)}', (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                                             # contar parpadeos
-                                            if longitud1 <= 14 and longitud2 <= 14 and parpadeando == False: 
-                                                cant_parpadeos = cant_parpadeos + 1
-                                                parpadeando = True
-                                                inicio_sueno = time.time()
-                                            elif longitud1 > 14 and longitud2 > 14 and parpadeando == True: 
-                                                parpadeando = False
-                                                fin_sueno = time.time()
+                                            if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
+                                                self.cant_parpadeos += 1
+                                                self.parpadeando = True
+                                                self.inicio_sueno = time.time()
+                                            elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
+                                                self.parpadeando = False
+                                                self.fin_sueno = time.time()
                                             # temporizador
-                                            tiempo = round(fin_sueno - inicio_sueno, 0)
+                                            self.tiempo = round(self.fin_sueno - self.inicio_sueno, 0)
                                             # contador micro sueño
-                                            if tiempo >= 3:
-                                                micro_sueno = micro_sueno + 1
-                                                duracion_sueno = tiempo
-                                                inicio_sueno = 0
-                                                fin_sueno = 0
+                                            if self.tiempo >= 3:
+                                                self.micro_sueno += 1
+                                                self.duracion_sueno = self.tiempo
+                                                self.inicio_sueno = 0
+                                                self.fin_sueno = 0
 
 
                     else:

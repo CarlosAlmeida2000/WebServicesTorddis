@@ -87,7 +87,7 @@ class vwPermisosObjetos(APIView):
         if request.method == 'DELETE':
             try:
                 permiso = PermisosObjetos()
-                return Response({'camara': permiso.desactivar(request.GET['permiso_objeto_id'])})
+                return Response({'camara': permiso.desactivar(request)})
             except Exception as e: 
                 return Response({'camara': 'error'})
 
@@ -111,7 +111,6 @@ class vwConfiguracion(APIView):
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                json_data = json.loads(request.body.decode('utf-8'))
                 return Response({'monitoreo': Monitoreo.start()})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
@@ -120,7 +119,7 @@ class vwConfiguracion(APIView):
         if request.method == 'DELETE':
             try:
                 monitoreo = Monitoreo()
-                return Response({'monitoreo': monitoreo.desactivar(request.GET['monitoreo_id'])})
+                return Response({'monitoreo': monitoreo.desactivar(request)})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 
