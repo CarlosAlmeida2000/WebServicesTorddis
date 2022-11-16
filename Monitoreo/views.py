@@ -39,8 +39,6 @@ class vwCamara(APIView):
                     camara = Camaras.objects.get(pk = request.GET['id'])
                 elif 'direccion_ip' in request.GET:
                     camara = Camaras.objects.get(direccion_ip = request.GET['direccion_ip'])
-                elif 'nombre_camara' in request.GET:
-                    camara = Camaras.objects.get(nombre_camara = request.GET['nombre_camara'])
                 camara.delete()
                 return Response({'camara': 'eliminada'})
             except Camaras.DoesNotExist:

@@ -2,6 +2,7 @@ from django.db.models import Q, Value, BooleanField, IntegerField
 from Monitoreo.reconocimiento import Monitorizar
 from Persona.models import Supervisados, Tutores
 from django.db.models.functions import Concat
+from django.db import IntegrityError
 from django.db import transaction
 from Persona.image import Image
 from django.db import models
@@ -12,7 +13,7 @@ class TiposDistraccion(models.Model):
     nombre = models.CharField(max_length = 25)
 
 class Camaras(models.Model):
-    direccion_ip = models.CharField(max_length = 100)
+    direccion_ip = models.CharField(max_length = 100, unique = True)
     nombre_camara = models.CharField(max_length = 20)
     habilitada = models.BooleanField()
     tutor = models.ForeignKey('Persona.Tutores', on_delete = models.PROTECT, related_name = "camaras_tutor")
@@ -20,14 +21,14 @@ class Camaras(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'id' in request.GET:
-                camaras = Camaras.objects.filter(pk = request.GET['id'])   
-            elif 'direccion_ip' in request.GET:
-                camaras = Camaras.objects.filter(direccion_ip__icontains = request.GET['direccion_ip'])   
-            elif 'nombre_camara' in request.GET:
-                camaras = Camaras.objects.filter(nombre_camara__icontains = request.GET['nombre_camara'])   
-            else:
-                camaras = Camaras.objects.all()
+            if 'id' in request.GET and 'tutor_id' in request.GET:
+                camaras = Camaras.objects.filter(Q(pk = request.GET['id']) & Q(tutor_id = request.GET['tutor_id']))   
+            elif 'direccion_ip' in request.GET and 'tutor_id' in request.GET:
+                camaras = Camaras.objects.filter(Q(direccion_ip__icontains = request.GET['direccion_ip']) & Q(tutor_id = request.GET['tutor_id']))   
+            elif 'nombre_camara' in request.GET and 'tutor_id' in request.GET:
+                camaras = Camaras.objects.filter(Q(nombre_camara__icontains = request.GET['nombre_camara']) & Q(tutor_id = request.GET['tutor_id']))   
+            elif 'tutor_id' in request.GET:
+                camaras = Camaras.objects.filter(tutor_id = request.GET['tutor_id'])
             camaras = camaras.order_by('tutor_id').select_related('tutor').values('id', 'direccion_ip', 'nombre_camara', 'habilitada', 'tutor_id')
             return list(camaras)
         except Exception as e: 
@@ -44,8 +45,14 @@ class Camaras(models.Model):
                 self.habilitada = json_data['habilitada']
             if 'tutor_id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
+            existe_camara = Camaras.objects.filter(Q(tutor_id = self.tutor.pk) & Q(nombre_camara = self.nombre_camara))
+            if(len(existe_camara)) and not existe_camara[0].pk == self.pk:
+                return 'cámara repetida'    
             self.save()
             return 'guardada'
+        except IntegrityError:
+            transaction.savepoint_rollback(punto_guardado)
+            return 'cámara repetida'
         except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'

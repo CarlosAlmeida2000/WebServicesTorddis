@@ -141,6 +141,7 @@ class Monitorizar:
                     self.persona_identif = self.reconocedor_facial.predict(rostro)
                     cv2.putText(video,'{}'.format(self.persona_identif), (x, y - 5), 1, 1.3, (255, 255, 0), 1, cv2.LINE_AA)
                     if self.persona_identif[1] < 70:
+                        # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
                         self.supervisado = Supervisados.objects.filter(persona_id = self.lista_supervisados[self.persona_identif[0]]).select_related('persona')
                         if(len(self.supervisado)):
                             cv2.putText(video,'{}'.format(self.supervisado[0].persona.nombres), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
@@ -201,16 +202,13 @@ class Monitorizar:
                                                 self.inicio_sueno = 0
                                                 self.fin_sueno = 0
 
+                            # ------ RECONOCIMIENTO # 4 - Reconocer objetos        
+
 
                     else:
                         # SE REGISTRA UN HISTORIAL CON EL TIPO DE DISTRACCION = 1. Reconocer persona, con observación: persona desconocida
                         cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                         cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
-                
-
-                # ------ RECONOCIMIENTO # 4 - Reconocer objetos        
-
-
 
                 cv2.imshow('Video', cv2.resize(video,(1500, 760), interpolation = cv2.INTER_CUBIC))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
