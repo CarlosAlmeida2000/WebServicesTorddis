@@ -30,7 +30,7 @@ class Camaras(models.Model):
             elif 'tutor_id' in request.GET:
                 camaras = Camaras.objects.filter(tutor_id = request.GET['tutor_id'])
             camaras = camaras.order_by('tutor_id').select_related('tutor').values('id', 'direccion_ip', 'nombre_camara', 'habilitada', 'tutor_id')
-            return list(camaras)
+            return camaras
         except Exception as e: 
             return 'error'
 
@@ -79,7 +79,7 @@ class PermisosObjetos(models.Model):
                     if(len(permiso)):
                         objetos[i]['habilitado'] = True
                         objetos[i]['permiso_objeto_id'] = permiso[0].id
-                return list(objetos)
+                return objetos
             elif 'tutor_id' in request.GET:
                 objetos = Objetos.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
@@ -88,7 +88,7 @@ class PermisosObjetos(models.Model):
                     if(len(permiso)):
                         objetos[i]['habilitado'] = True
                         objetos[i]['permiso_objeto_id'] = permiso[0].id
-                return list(objetos)
+                return objetos
         except Exception as e: 
             return 'error'
 
@@ -135,7 +135,7 @@ class Monitoreo(models.Model):
                     if(len(monitoreo)):
                         tipos_distraccion[i]['habilitado'] = True
                         tipos_distraccion[i]['tipo_distraccion_id'] = monitoreo[0].id
-                return list(tipos_distraccion)
+                return tipos_distraccion
             elif 'tutor_id' in request.GET:
                 tipos_distraccion = TiposDistraccion.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(tipo_distraccion_id = Value(0, output_field = IntegerField())).values()
                 monitoreo_dis = Monitoreo.objects.filter(tutor_id = request.GET['tutor_id'])
@@ -144,7 +144,7 @@ class Monitoreo(models.Model):
                     if(len(monitoreo)):
                         tipos_distraccion[i]['habilitado'] = True
                         tipos_distraccion[i]['tipo_distraccion_id'] = monitoreo[0].id
-                return list(tipos_distraccion)
+                return tipos_distraccion
         except Exception as e: 
             return 'error'
 
@@ -223,7 +223,7 @@ class Historial(models.Model):
                 if(historial[u]['imagen_evidencia'] != ''):
                     file.ruta = historial[u]['imagen_evidencia']
                     historial[u]['imagen_evidencia'] = file.get_base64()
-            return list(historial)
+            return historial
         except Exception as e: 
             return 'error'
     

@@ -1,4 +1,5 @@
 import os
+from Persona.models import Personas
 import cv2
 import imutils
 import numpy as np
@@ -7,7 +8,7 @@ from .models import *
 
 class EntrenamientoFacial:
     def __init__(self, persona_id, camara_id):
-        self.persona_id = persona_id
+        self.supervisado = Supervisados.objects.get(persona_id = persona_id)
         self.camara_id = camara_id
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
@@ -21,7 +22,7 @@ class EntrenamientoFacial:
     
     def entrenar(self):
         try:
-            os.makedirs(self.ruta_rostros + '\\' + str(self.persona_id), exist_ok = True)
+            os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres, exist_ok = True)
             # se crean las 200 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
             cap = cv2.VideoCapture(0)
             while True:
@@ -37,7 +38,7 @@ class EntrenamientoFacial:
                     cv2.rectangle(video, (x, y),(x + w, y + h),(0, 255, 0), 2)
                     rostro = auxFrame[y:y + h, x:x + w]
                     rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
-                    cv2.imwrite(self.ruta_rostros + '\\' + str(self.persona_id) + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
+                    cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
                     self.cont_imagenes += 1
                 cv2.imshow('Video', cv2.resize(video,(1500, 760), interpolation = cv2.INTER_CUBIC))
                 k =  cv2.waitKey(1)
@@ -60,4 +61,4 @@ class EntrenamientoFacial:
         except Camaras.DoesNotExist:
             return 'La cámara no está registrada'
         except Exception as e: 
-            return 'error'
+            return 'error'+str(e)

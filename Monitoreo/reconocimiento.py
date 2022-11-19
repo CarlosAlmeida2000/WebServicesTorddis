@@ -104,11 +104,11 @@ class Monitorizar:
         historial = Historial()
         historial.fecha_hora = datetime.now()
         historial.observacion = observacion
-        historial.supervisado = self.supervisado[0]
+        historial.supervisado = Supervisados.objects.get(pk = self.supervisado)
         historial.tipo_distraccion = self.tipo_distraccion
         frame_jpg = cv2.imencode('.png', cv2.resize(self.imagen_evidencia,(450, 450),interpolation = cv2.INTER_CUBIC))
         file = ContentFile(frame_jpg[1])
-        historial.imagen_evidencia.save('persona_id_' + str(self.supervisado[0].persona.id) + '_fecha_hora_' + str(historial.fecha_hora) + '.png', file, save = True)
+        historial.imagen_evidencia.save('persona_id_' + str(historial.supervisado.persona.id) + '_fecha_hora_' + str(historial.fecha_hora) + '.png', file, save = True)
         historial.save()
 
     def reconocer(self):
@@ -120,9 +120,6 @@ class Monitorizar:
                 ret, video = cap.read()
                 if not ret:
                     break
-
-                # /*/*/*/*/*/*/**/*//*/*/* OJO, MIRAR EL CÓDIGO DE CORREGIR COLOR "frameRGB" PARA EL PROYECTO
-
                 # Lee una imagen de un búfer en la memoria
                 gray = cv2.cvtColor(video, cv2.COLOR_BGR2GRAY)
                 # correción de color
@@ -130,8 +127,6 @@ class Monitorizar:
                 # se crean copias del video
                 video_gris = gray.copy()
                 video_color = frameRGB.copy()
-
-
                 # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
                 rostros = self.clasificador_haar.detectMultiScale(gray, scaleFactor = 1.3, minNeighbors = 5)
                 # recorriendo rostros 
@@ -143,76 +138,68 @@ class Monitorizar:
                     cv2.putText(video,'{}'.format(self.persona_identif), (x, y - 5), 1, 1.3, (255, 255, 0), 1, cv2.LINE_AA)
                     if self.persona_identif[1] < 70:
                         # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
-                        self.supervisado = Supervisados.objects.filter(persona_id = self.lista_supervisados[self.persona_identif[0]]).select_related('persona')
-                        if(len(self.supervisado)):
-                            cv2.putText(video,'{}'.format(self.supervisado[0].persona.nombres), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
-                            cv2.rectangle(video, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                            cv2.rectangle(video, (x, y-50), (x + w, y + h + 10), (255, 0, 0), 2)
-
-
-                            # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
-                            cropped_img = np.expand_dims(np.expand_dims(cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC), -1), 0)
-                            prediction = self.modelo_expresiones.predict(cropped_img)
-                            cv2.putText(video, self.expresion_facial[int(np.argmax(prediction))], (x + 20, y-60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                            # SE REGISTRA UN HISTORIAL DEL CAMBIO DE EXPRESIONES FACIALES (solo expresiones de enfado, disgustado, triste y temeroso) DEL SUPERVISADO, CONSIDERAR SI SOLO SE REGISTRA LOS ESTADOS DE ANIMO MAS PREOCUPANTES: ENFADO, TRIZTE Y TEMEROSO
+                        
+                        self.supervisado = self.lista_supervisados[self.persona_identif[0]]
+                        cv2.putText(video,'{}'.format(self.supervisado), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
+                        cv2.rectangle(video, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                        cv2.rectangle(video, (x, y-50), (x + w, y + h + 10), (255, 0, 0), 2)
+                        # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
+                        cropped_img = np.expand_dims(np.expand_dims(cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC), -1), 0)
+                        prediction = self.modelo_expresiones.predict(cropped_img)
+                        cv2.putText(video, self.expresion_facial[int(np.argmax(prediction))], (x + 20, y-60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                        # SE REGISTRA UN HISTORIAL DEL CAMBIO DE EXPRESIONES FACIALES (solo expresiones de enfado, disgustado, triste y temeroso) DEL SUPERVISADO, CONSIDERAR SI SOLO SE REGISTRA LOS ESTADOS DE ANIMO MAS PREOCUPANTES: ENFADO, TRIZTE Y TEMEROSO
 
 
 
-                            # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
-                            # observamos los resultados
-                            resultados = self.MallaFacial.process(frameRGB)
-                            # Se limpia la lista para los nuevos puntos faciales
-                            self.puntos_faciales.clear()
-                            if resultados.multi_face_landmarks: # existe un rostro
-                                for rostro_detec in resultados.multi_face_landmarks:
-                                    self.mpDibujo.draw_landmarks(video, rostro_detec, self.mpMallaFacial.FACEMESH_CONTOURS, self.ConfDibu, self.ConfDibu)
-                                    # extraer los puntos del rostro detectado
-                                    for id, puntos in enumerate(rostro_detec.landmark):
-                                        al, an, c = video.shape
-                                        x, y = int(puntos.x * an), int(puntos.y * al)
-                                        self.puntos_faciales.append([id, x, y])
-                                        if len(self.puntos_faciales) == 468:
-                                            # ojo derecho
-                                            x1, y1 = self.puntos_faciales[145][1:]
-                                            x2, y2 = self.puntos_faciales[159][1:]
-                                            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                                            longitud1 = math.hypot(x2 - x1, y2 -y1)
-                                            # ojo izquierdo
-                                            x3, y3 = self.puntos_faciales[374][1:]
-                                            x4, y4 = self.puntos_faciales[386][1:]
-                                            cx2, cy2 = (x3 + x4) // 2, (y3 + y4) // 2
-                                            longitud2 = math.hypot(x4 - x3, y4 -y3)
-                                            cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                                            cv2.putText(video, f'Micro sueno: {int(self.micro_sueno)}', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                                            cv2.putText(video, f'Duracion: {int(self.duracion_sueno)}', (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-                                            # contar parpadeos
-                                            if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
-                                                # Cerró los ojos
-                                                print("cerro ", longitud1, longitud2)
-                                                self.cant_parpadeos += 1
-                                                self.parpadeando = True
-                                                self.inicio_sueno = time.time()
-                                            elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
-                                                # Abrió los ojos
-                                                print("abrio ", longitud1, longitud2)
-                                                self.parpadeando = False
-                                                self.fin_sueno = time.time()
-                                            # temporizador
-                                            self.tiempo = round(self.fin_sueno - self.inicio_sueno, 0)
-                                            # contador micro sueño
-                                            if self.tiempo >= 3:
-                                                self.micro_sueno += 1
-                                                self.duracion_sueno = self.tiempo
-                                                self.inicio_sueno = 0
-                                                self.fin_sueno = 0
+                        # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
+                        # observamos los resultados
+                        resultados = self.MallaFacial.process(frameRGB)
+                        # Se limpia la lista para los nuevos puntos faciales
+                        self.puntos_faciales.clear()
+                        if resultados.multi_face_landmarks: # existe un rostro
+                            for rostro_detec in resultados.multi_face_landmarks:
+                                self.mpDibujo.draw_landmarks(video, rostro_detec, self.mpMallaFacial.FACEMESH_CONTOURS, self.ConfDibu, self.ConfDibu)
+                                # extraer los puntos del rostro detectado
+                                for id, puntos in enumerate(rostro_detec.landmark):
+                                    al, an, c = video.shape
+                                    x, y = int(puntos.x * an), int(puntos.y * al)
+                                    self.puntos_faciales.append([id, x, y])
+                                    if len(self.puntos_faciales) == 468:
+                                        # ojo derecho
+                                        x1, y1 = self.puntos_faciales[145][1:]
+                                        x2, y2 = self.puntos_faciales[159][1:]
+                                        longitud1 = math.hypot(x2 - x1, y2 -y1)
+                                        # ojo izquierdo
+                                        x3, y3 = self.puntos_faciales[374][1:]
+                                        x4, y4 = self.puntos_faciales[386][1:]
+                                        longitud2 = math.hypot(x4 - x3, y4 -y3)
+                                        cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                                        cv2.putText(video, f'Micro sueno: {int(self.micro_sueno)}', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                        cv2.putText(video, f'Duracion: {int(self.duracion_sueno)}', (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                                        # contar parpadeos
+                                        if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
+                                            # Cerró los ojos
+                                            self.cant_parpadeos += 1
+                                            self.parpadeando = True
+                                            self.inicio_sueno = time.time()
+                                        elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
+                                            # Abrió los ojos
+                                            self.parpadeando = False
+                                            self.fin_sueno = time.time()
+                                        # temporizador
+                                        self.tiempo = round(self.fin_sueno - self.inicio_sueno, 0)
+                                        # contador micro sueño
+                                        if self.tiempo >= 3:
+                                            self.micro_sueno += 1
+                                            self.duracion_sueno = self.tiempo
+                                            self.inicio_sueno = 0
+                                            self.fin_sueno = 0
 
-                            # ------ RECONOCIMIENTO # 4 - Reconocer objetos        
+                                        # SI duracion_sueno es mayor a 10 segundo se considera persona dormida y se REGISTRA UN HISTORIAL
 
-                        else:
-                            # no se encontró a la persona en la BBDD
-                            # SE REGISTRA UN HISTORIAL CON EL TIPO DE DISTRACCION = 1. Reconocer persona, con observación: persona desconocida
-                            cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
-                            cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
+
+                                    # ------ RECONOCIMIENTO # 4 - Reconocer objetos        
+
                     else:
                         # SE REGISTRA UN HISTORIAL CON EL TIPO DE DISTRACCION = 1. Reconocer persona, con observación: persona desconocida
                         cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)

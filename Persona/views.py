@@ -8,7 +8,7 @@ class vwTutor(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'tutores': Tutores.obtener_datos(request)})
+                return Response(Tutores.obtener_datos(request))
             except Exception as e:
                 return Response({'tutores': 'error'})
         
@@ -35,7 +35,7 @@ class vwAutenticacion(APIView):
         if request.method == 'POST':
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
-                return Response({'tutores': Tutores.login(json_data)})
+                return Response(Tutores.login(json_data))
             except Exception as e: 
                 return Response({'tutores': 'error'})
 
@@ -43,7 +43,7 @@ class vwSupervisados(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'supervisados': Supervisados.obtener_datos(request)})
+                return Response(Supervisados.obtener_datos(request))
             except Exception as e:
                 return Response({'supervisados': 'error'})
 

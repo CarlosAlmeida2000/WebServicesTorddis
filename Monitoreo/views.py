@@ -10,7 +10,7 @@ class vwCamara(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'camara': Camaras.obtener_datos(request)})
+                return Response(Camaras.obtener_datos(request))
             except Exception as e:
                 return Response({'camara': 'error'})
 
@@ -51,7 +51,7 @@ class vwEntrenamientoFacial(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'camara': Camaras.obtener_datos(request)})
+                return Response(Camaras.obtener_datos(request))
             except Exception as e:
                 return Response({'camara': 'error'})
 
@@ -68,7 +68,7 @@ class vwPermisosObjetos(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'objetos': PermisosObjetos.obtener_datos(request)})
+                return Response(PermisosObjetos.obtener_datos(request))
             except Exception as e:
                 return Response({'objetos': 'error'})
     
@@ -93,7 +93,7 @@ class vwConfiguracion(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'monitoreo': Monitoreo.obtener_datos(request)})
+                return Response(Monitoreo.obtener_datos(request))
             except Exception as e:
                 return Response({'monitoreo': 'error'})
 
@@ -125,7 +125,7 @@ class vwHistorial(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'historial': Historial.obtener_datos(request)})
+                return Response(Historial.obtener_datos(request))
             except Exception as e:
                 return Response({'historial': 'error'})
 
@@ -134,10 +134,10 @@ class vwGrafico(APIView):
         if request.method == 'GET':
             try:
                 if request.GET['tipo_grafico'] == 'grafico_sueno':
-                    return Response({'grafico': Historial.grafico_sueno(request)})
+                    return Response(Historial.grafico_sueno(request))
                 elif request.GET['tipo_grafico'] == 'grafico_objetos':
-                    return Response({'grafico': Historial.grafico_objetos(request)})
+                    return Response(Historial.grafico_objetos(request))
                 else:
-                    return Response({'grafico': Historial.grafico_expresion(request)})
+                    return Response(Historial.grafico_expresion(request))
             except Exception as e:
                 return Response({'grafico': 'error'})

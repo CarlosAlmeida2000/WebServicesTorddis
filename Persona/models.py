@@ -29,7 +29,6 @@ class Personas(models.Model):
         periodo = rdelta.relativedelta(fecha_fin, fecha_inicio)
         return periodo.years, periodo.months, periodo.days
 
-
     def guardar(self, json_data, rol):
         punto_guardado = transaction.savepoint()
         try:
@@ -95,7 +94,7 @@ class Tutores(models.Model):
                 if(tutores[u]['persona__foto_perfil'] != ''):
                     file.ruta = tutores[u]['persona__foto_perfil']
                     tutores[u]['persona__foto_perfil'] = file.get_base64()
-            return list(tutores)
+            return tutores
         except Exception as e: 
             return 'error'
 
@@ -183,7 +182,7 @@ class Supervisados(models.Model):
                 # Calcular edad del supervisado
                 anios, meses, dias = Personas.calcular_edad(supervisados[u]['persona__fecha_nacimiento'])
                 supervisados[u]['persona__edad'] = (str(anios) + ' años ' + str(meses) + ' meses ' + str(dias) + ' días')
-            return list(supervisados)
+            return supervisados
         except Exception as e: 
             return 'error'
 
