@@ -1,12 +1,10 @@
-from django.db import models
-
 # Create your models here.
-from django.db import models
-from django.db.models import Q, Value
+from django.db import models, IntegrityError, transaction
+from django.db.models import Q, Value, CharField
 from django.db.models.functions import Concat
-from django.db import transaction
 from fernet_fields import EncryptedTextField
-from django.db import IntegrityError
+from dateutil import relativedelta as rdelta
+from datetime import date, datetime
 from Persona.image import Image
 import os
 
@@ -20,6 +18,17 @@ class Personas(models.Model):
     cedula = models.CharField(max_length = 10, unique = True)
     fecha_nacimiento = models.DateField()
     foto_perfil = models.ImageField(upload_to = 'Perfiles', null = True, blank = True)
+    
+    @staticmethod
+    def calcular_edad(fecha_naci):
+        fecha_inicio = date(int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).year), 
+            int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).month), 
+            int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).day))
+        fecha_fin = date(datetime.today().year, datetime.today().month, datetime.today().day)
+        # Calcular el periodo transcurrido entre las fechas
+        periodo = rdelta.relativedelta(fecha_fin, fecha_inicio)
+        return periodo.years, periodo.months, periodo.days
+
 
     def guardar(self, json_data, rol):
         punto_guardado = transaction.savepoint()
@@ -125,7 +134,6 @@ class Tutores(models.Model):
             tutor = Tutores.objects.get(usuario = json_data['usuario'])
             if(tutor.clave == json_data['clave']):
                 file = Image()
-                roles = RolesPersonas.objects.filter(persona_id = tutor.persona.id).select_related('rol')
                 base64 = ''
                 if(tutor.persona.foto_perfil != ''):
                     file.ruta = tutor.persona.foto_perfil
@@ -139,8 +147,7 @@ class Tutores(models.Model):
                         'persona__nombres': tutor.persona.nombres,
                         'persona__apellidos': tutor.persona.apellidos,
                         'persona__cedula': tutor.persona.cedula,
-                        'persona__fecha_nacimiento': tutor.persona.fecha_nacimiento,
-                        'roles': {roles.values('rol__nombre')}
+                        'persona__fecha_nacimiento': tutor.persona.fecha_nacimiento
                         }
                 return json_usuario
             else:   
@@ -158,23 +165,24 @@ class Supervisados(models.Model):
     def obtener_datos(request):
         try:
             if 'id' in request.GET and 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(Q(pk = request.GET['id']) & Q(tutor__pk = request.GET['tutor_id']))   
+                supervisados = Supervisados.objects.filter(Q(pk = request.GET['id']) & Q(tutor__pk = request.GET['tutor_id'])).annotate(persona__edad = Value('', output_field = CharField()))   
             elif 'persona__cedula' in request.GET and 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(Q(persona__cedula__icontains = request.GET['persona__cedula']) & Q(tutor__pk = request.GET['tutor_id']))   
+                supervisados = Supervisados.objects.filter(Q(persona__cedula__icontains = request.GET['persona__cedula']) & Q(tutor__pk = request.GET['tutor_id'])).annotate(persona__edad = Value('', output_field = CharField()))      
             elif 'nombres_apellidos' in request.GET and 'tutor_id' in request.GET:
-                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
+                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos')).annotate(persona__edad = Value('', output_field = CharField()))   
                 supervisados = supervisados.filter(nombres_completos__icontains = request.GET['nombres_apellidos'])
             elif 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])
-            else:
-                supervisados = Supervisados.objects.all()
+                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id']).annotate(persona__edad = Value('', output_field = CharField()))   
             supervisados = supervisados.values('id', 'tutor_id',
-                'persona_id','persona__nombres', 'persona__apellidos', 'persona__cedula', 'persona__fecha_nacimiento', 'persona__foto_perfil')
+                'persona_id','persona__nombres', 'persona__apellidos', 'persona__cedula', 'persona__fecha_nacimiento', 'persona__edad', 'persona__foto_perfil')
             file = Image()
             for u in range(len(supervisados)):
                 if(supervisados[u]['persona__foto_perfil'] != ''):
                     file.ruta = supervisados[u]['persona__foto_perfil']
                     supervisados[u]['persona__foto_perfil'] = file.get_base64()
+                # Calcular edad del supervisado
+                anios, meses, dias = Personas.calcular_edad(supervisados[u]['persona__fecha_nacimiento'])
+                supervisados[u]['persona__edad'] = (str(anios) + ' años ' + str(meses) + ' meses ' + str(dias) + ' días')
             return list(supervisados)
         except Exception as e: 
             return 'error'
@@ -189,13 +197,18 @@ class Supervisados(models.Model):
             else:
                 # Es una nueva persona
                 self.persona = Personas()
-            persona_guardada, self.persona = self.persona.guardar(json_data, 'Supervisado')
-            if(persona_guardada == 'si'):
-                self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])    
-                self.save()
-                return 'guardado'
+            # Calcular edad del supervisado
+            anios, meses, dias = Personas.calcular_edad(json_data['persona__fecha_nacimiento'])
+            if anios <= 15:
+                persona_guardada, self.persona = self.persona.guardar(json_data, 'Supervisado')
+                if(persona_guardada == 'si'):
+                    self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])    
+                    self.save()
+                    return 'guardado'
+                else:
+                    return persona_guardada  
             else:
-                return persona_guardada    
+                return 'Edad máxima 15 años'  
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
