@@ -90,7 +90,7 @@ class vwPermisosObjetos(APIView):
             except Exception as e: 
                 return Response({'camara': 'error'})
 
-class vwConfiguracion(APIView):
+class vwTiposDistraccion(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
@@ -110,7 +110,7 @@ class vwConfiguracion(APIView):
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                monitoreo = Monitorizar()
+                monitoreo = Monitorizar(tutor_id = 1)
                 hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
                 hilo_vigilar.start()
                 # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA 
@@ -142,11 +142,11 @@ class vwGrafico(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                if request.GET['tipo_grafico'] == 'grafico_sueno':
+                if request.GET['tipo_grafico'] == 'grafico_expresiones':
+                    return Response(Historial.grafico_expresion(request))
+                elif request.GET['tipo_grafico'] == 'grafico_sueno':
                     return Response(Historial.grafico_sueno(request))
                 elif request.GET['tipo_grafico'] == 'grafico_objetos':
                     return Response(Historial.grafico_objetos(request))
-                else:
-                    return Response(Historial.grafico_expresion(request))
             except Exception as e:
                 return Response({'grafico': 'error'})

@@ -80,11 +80,9 @@ class Tutores(models.Model):
         try:
             if 'id' in request.GET:
                 tutores = Tutores.objects.filter(pk = request.GET['id'])   
-            elif 'persona__cedula' in request.GET:
-                tutores = Tutores.objects.filter(persona__cedula__icontains = request.GET['persona__cedula'])   
-            elif 'nombres_apellidos' in request.GET:
+            elif 'nombres_cedula' in request.GET:
                 tutores = (Tutores.objects.all().select_related('persona')).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
-                tutores = tutores.filter(nombres_completos__icontains = request.GET['nombres_apellidos'])
+                tutores = tutores.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
             else:
                 tutores = Tutores.objects.all()
             tutores = tutores.order_by('usuario').select_related('persona').values('id', 'usuario', 'correo',
@@ -165,11 +163,9 @@ class Supervisados(models.Model):
         try:
             if 'id' in request.GET and 'tutor_id' in request.GET:
                 supervisados = Supervisados.objects.filter(Q(pk = request.GET['id']) & Q(tutor__pk = request.GET['tutor_id'])).annotate(persona__edad = Value('', output_field = CharField()))   
-            elif 'persona__cedula' in request.GET and 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(Q(persona__cedula__icontains = request.GET['persona__cedula']) & Q(tutor__pk = request.GET['tutor_id'])).annotate(persona__edad = Value('', output_field = CharField()))      
-            elif 'nombres_apellidos' in request.GET and 'tutor_id' in request.GET:
+            elif 'nombres_cedula' in request.GET and 'tutor_id' in request.GET:
                 supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos')).annotate(persona__edad = Value('', output_field = CharField()))   
-                supervisados = supervisados.filter(nombres_completos__icontains = request.GET['nombres_apellidos'])
+                supervisados = supervisados.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
             elif 'tutor_id' in request.GET:
                 supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id']).annotate(persona__edad = Value('', output_field = CharField()))   
             supervisados = supervisados.values('id', 'tutor_id',
