@@ -1,4 +1,5 @@
 from Monitoreo.entrenamiento_facial import EntrenamientoFacial
+from Monitoreo.reconocimiento import Monitorizar
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import *
@@ -109,7 +110,15 @@ class vwConfiguracion(APIView):
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                return Response({'monitoreo': Monitoreo.start()})
+                monitoreo = Monitorizar()
+                hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
+                hilo_vigilar.start()
+                # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA 
+                    # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
+                    #     monitoreo = Monitorizar()
+                    #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
+                    #     hilo_vigilar.start()
+                return Response({'monitoreo': 'monitoreando........'})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 

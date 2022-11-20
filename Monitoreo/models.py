@@ -1,5 +1,4 @@
 from django.db.models import Q, Value, BooleanField, IntegerField
-from Monitoreo.reconocimiento import Monitorizar
 from Persona.models import Supervisados, Tutores
 from django.db.models.functions import Concat
 from django.db import IntegrityError
@@ -148,23 +147,6 @@ class Monitoreo(models.Model):
         except Exception as e: 
             return 'error'
 
-    
-    @staticmethod
-    def start():
-        try:
-            monitoreo = Monitorizar()
-            hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
-            hilo_vigilar.start()
-            # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA 
-                # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
-                #     monitoreo = Monitorizar()
-                #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
-                #     hilo_vigilar.start()
-            return 'monitoreando........'
-        except Exception as e: 
-            return 'error2 '+str(e)
-
-
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
@@ -216,7 +198,7 @@ class Historial(models.Model):
             else:
                 supervisados = Supervisados.objects.all()
                 historial = Historial.objects.all().exclude(~Q(supervisado_id__in = supervisados.values('id')))
-            historial = historial.values('id', 'fecha_hora', 'imagen_evidencia', 'tipo_distraccion_id', 'tipo_distraccion__nombre' 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos', 'supervisado__persona__cedula')
+            historial = historial.values('id', 'fecha_hora', 'observacion', 'imagen_evidencia', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos', 'supervisado__persona__cedula')
             file = Image()
             for u in range(len(historial)):
                 historial[u]['fecha_hora'] = historial[u]['fecha_hora'].strftime('%Y-%m-%d %H:%M')

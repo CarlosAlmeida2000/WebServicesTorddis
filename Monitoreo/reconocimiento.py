@@ -4,10 +4,10 @@ from django.core.files.base import ContentFile
 from Persona.models import Supervisados
 from urllib.request import urlopen
 from django.db.models import Q
+from Monitoreo.models import *
 from datetime import datetime
 import cv2, math, os, time
 import mediapipe as mp
-from .models import *
 import numpy as np
 
 class Monitorizar:
@@ -18,14 +18,11 @@ class Monitorizar:
     # 4. Reconocer objetos
     def __init__(self):
         # atributos generales 
-
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
         self.lista_supervisados = []
         self.imagen_evidencia = None
-        self.supervisado = None
-        self.tipo_distraccion = None
-        self.minutos_deteccion = 1
+        self.supervisado = '1_pedro'
         self.byte = bytes()
 
 
@@ -84,10 +81,10 @@ class Monitorizar:
         # variables de conteo de parpadeos
         self.parpadeando = False
         self.cant_parpadeos = 0
-        self.tiempo = 0
+        self.tiempo_dormido = 0
+        self.tiempo_permitido = 7
         self.inicio_sueno = 0
         self.fin_sueno = 0
-        self.micro_sueno = 0
         self.duracion_sueno = 0
         # configuración del dibujo
         self.mpDibujo = mp.solutions.drawing_utils
@@ -96,26 +93,35 @@ class Monitorizar:
         self.mpMallaFacial = mp.solutions.face_mesh
         self.MallaFacial = self.mpMallaFacial.FaceMesh(max_num_faces = 4)
         self.puntos_faciales = []
-        
+
+
+        # Reloj para el registro del historial
+        self.inicio_tiempo = 0
+        self.tiempo_registro = 0
+        self.registro_inicial = True
+        self.tiempo_deteccion = 60
 
 
     # se registra el historial de la monitorización
-    def guardarHistorial(self, observacion):
-        historial = Historial()
-        historial.fecha_hora = datetime.now()
-        historial.observacion = observacion
-        historial.supervisado = Supervisados.objects.get(pk = self.supervisado)
-        historial.tipo_distraccion = self.tipo_distraccion
+    def guardarHistorial(self, observacion, tipo_distraccion_id):
+        from .models import Historial, TiposDistraccion
+        self.historial = Historial()
+        self.historial.fecha_hora = datetime.now()
+        self.historial.observacion = observacion
+        self.historial.supervisado = Supervisados.objects.get(pk = self.supervisado.split('_')[0])
+        self.historial.tipo_distraccion = TiposDistraccion.objects.get(pk = tipo_distraccion_id)
         frame_jpg = cv2.imencode('.png', cv2.resize(self.imagen_evidencia,(450, 450),interpolation = cv2.INTER_CUBIC))
-        file = ContentFile(frame_jpg[1])
-        historial.imagen_evidencia.save('persona_id_' + str(historial.supervisado.persona.id) + '_fecha_hora_' + str(historial.fecha_hora) + '.png', file, save = True)
-        historial.save()
+        file = ContentFile(frame_jpg[1]) 
+        self.historial.imagen_evidencia.save('dis_' + str(tipo_distraccion_id) + '_id_' + str(self.historial.supervisado.persona.id) + '_' + str(self.historial.fecha_hora) + '.png', file, save = True)
+        self.historial.save()
 
     def reconocer(self):
         try:
             cap = cv2.VideoCapture(0)
+            # CUANDO SE PRUEBE CON EL DISPOSITIVO, AJUSTAR ABAJO LAS LONGITUDES CUANDO SE CIERRA Y ABRE UN OJO, 14 ES CUANDO SE USA LA RESOLUCION DE 1280 X 720
             cap.set(3, 1280) # ancho ventana
             cap.set(6, 720) # alto ventana
+            self.inicio_tiempo = time.time()
             while True:
                 ret, video = cap.read()
                 if not ret:
@@ -126,31 +132,33 @@ class Monitorizar:
                 frameRGB = cv2.cvtColor(video, cv2.COLOR_BGR2RGB)
                 # se crean copias del video
                 video_gris = gray.copy()
-                video_color = frameRGB.copy()
+                video_color = video.copy()
                 # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
                 rostros = self.clasificador_haar.detectMultiScale(gray, scaleFactor = 1.3, minNeighbors = 5)
                 # recorriendo rostros 
                 for (x, y, w, h) in rostros:
                     rostro = video_gris[y:y + h, x:x + w]
-                    self.imagen_evidencia = video_color[y:y + h, x:x + w]
                     # reconocimiento facial, se verifica si es una persona registrada
                     self.persona_identif = self.reconocedor_facial.predict(cv2.resize(rostro, (150, 150), interpolation = cv2.INTER_CUBIC))
                     cv2.putText(video,'{}'.format(self.persona_identif), (x, y - 5), 1, 1.3, (255, 255, 0), 1, cv2.LINE_AA)
                     if self.persona_identif[1] < 70:
                         # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
-                        
                         self.supervisado = self.lista_supervisados[self.persona_identif[0]]
-                        cv2.putText(video,'{}'.format(self.supervisado), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
+                        cv2.putText(video,'{}'.format(self.supervisado.split('_')[1]), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
                         cv2.rectangle(video, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                        cv2.rectangle(video, (x, y-50), (x + w, y + h + 10), (255, 0, 0), 2)
+                        cv2.rectangle(video, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
                         # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
                         cropped_img = np.expand_dims(np.expand_dims(cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC), -1), 0)
                         prediction = self.modelo_expresiones.predict(cropped_img)
-                        cv2.putText(video, self.expresion_facial[int(np.argmax(prediction))], (x + 20, y-60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                        # SE REGISTRA UN HISTORIAL DEL CAMBIO DE EXPRESIONES FACIALES (solo expresiones de enfado, disgustado, triste y temeroso) DEL SUPERVISADO, CONSIDERAR SI SOLO SE REGISTRA LOS ESTADOS DE ANIMO MAS PREOCUPANTES: ENFADO, TRIZTE Y TEMEROSO
-
-
-
+                        expresion = self.expresion_facial[int(np.argmax(prediction))]
+                        cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                        ultimo_historial = (Historial.objects.filter(Q(supervisado_id = self.supervisado.split('_')[0]) & Q(observacion = expresion)).order_by('-fecha_hora'))
+                        if(len(ultimo_historial)):
+                            fecha_historial = datetime.strptime(ultimo_historial[0].fecha_hora.strftime('%Y-%m-%d %H:%M:%S.%f') , '%Y-%m-%d %H:%M:%S.%f')
+                            if ((datetime.now() - fecha_historial).seconds > self.tiempo_deteccion):
+                                self.guardarHistorial(expresion, 2)
+                        else:
+                            self.guardarHistorial(expresion, 2)
                         # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
                         # observamos los resultados
                         resultados = self.MallaFacial.process(frameRGB)
@@ -162,8 +170,8 @@ class Monitorizar:
                                 # extraer los puntos del rostro detectado
                                 for id, puntos in enumerate(rostro_detec.landmark):
                                     al, an, c = video.shape
-                                    x, y = int(puntos.x * an), int(puntos.y * al)
-                                    self.puntos_faciales.append([id, x, y])
+                                    punto_x, punto_y = int(puntos.x * an), int(puntos.y * al)
+                                    self.puntos_faciales.append([id, punto_x, punto_y])
                                     if len(self.puntos_faciales) == 468:
                                         # ojo derecho
                                         x1, y1 = self.puntos_faciales[145][1:]
@@ -174,37 +182,40 @@ class Monitorizar:
                                         x4, y4 = self.puntos_faciales[386][1:]
                                         longitud2 = math.hypot(x4 - x3, y4 -y3)
                                         cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                                        cv2.putText(video, f'Micro sueno: {int(self.micro_sueno)}', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                                        cv2.putText(video, f'Duracion: {int(self.duracion_sueno)}', (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                                         # contar parpadeos
                                         if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
                                             # Cerró los ojos
                                             self.cant_parpadeos += 1
                                             self.parpadeando = True
                                             self.inicio_sueno = time.time()
+                                            # Justo el momento que cerró los ojos se captura la imagen
+                                            self.imagen_evidencia = video_color[y:y + h, x:x + w]
                                         elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
                                             # Abrió los ojos
                                             self.parpadeando = False
                                             self.fin_sueno = time.time()
                                         # temporizador
-                                        self.tiempo = round(self.fin_sueno - self.inicio_sueno, 0)
+                                        self.tiempo_dormido = round(self.fin_sueno - self.inicio_sueno, 0)
                                         # contador micro sueño
-                                        if self.tiempo >= 3:
-                                            self.micro_sueno += 1
-                                            self.duracion_sueno = self.tiempo
+                                        if self.tiempo_dormido >= self.tiempo_permitido:
+                                            self.guardarHistorial('Presencia de sueño, parpadeo {0} veces'.format(self.cant_parpadeos), 3)
                                             self.inicio_sueno = 0
                                             self.fin_sueno = 0
-
-                                        # SI duracion_sueno es mayor a 10 segundo se considera persona dormida y se REGISTRA UN HISTORIAL
-
+                                            self.cant_parpadeos = 0
 
                                     # ------ RECONOCIMIENTO # 4 - Reconocer objetos        
 
                     else:
-                        # SE REGISTRA UN HISTORIAL CON EL TIPO DE DISTRACCION = 1. Reconocer persona, con observación: persona desconocida
                         cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                         cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
-
+                        self.tiempo_registro = round(time.time() - self.inicio_tiempo, 0)
+                        if (self.tiempo_registro >= self.tiempo_deteccion or self.registro_inicial):
+                            # Se captura la imagen de la persona desconocida
+                            self.imagen_evidencia = video_color[y:y + h, x:x + w]
+                            self.inicio_tiempo = time.time()
+                            self.registro_inicial = False
+                            self.guardarHistorial('Se identificó una persona desconocida', 1)
+                            
                 cv2.imshow('Video', video)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
