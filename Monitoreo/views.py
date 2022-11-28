@@ -37,9 +37,7 @@ class vwCamara(APIView):
         if request.method == 'DELETE':
             try:
                 if 'id' in request.GET:
-                    camara = Camaras.objects.get(pk = request.GET['id'])
-                elif 'direccion_ip' in request.GET:
-                    camara = Camaras.objects.get(direccion_ip = request.GET['direccion_ip'])
+                    camara = Camaras.objects.get(Q(pk = request.GET['id']) & Q(tutor_id = request.GET['tutor_id']))
                 camara.delete()
                 return Response({'camara': 'eliminada'})
             except Camaras.DoesNotExist:
@@ -142,11 +140,6 @@ class vwGrafico(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                if request.GET['tipo_grafico'] == 'grafico_expresiones':
-                    return Response(Historial.grafico_expresion(request))
-                elif request.GET['tipo_grafico'] == 'grafico_sueno':
-                    return Response(Historial.grafico_sueno(request))
-                elif request.GET['tipo_grafico'] == 'grafico_objetos':
-                    return Response(Historial.grafico_objetos(request))
+                return Response(Historial.graficos(request))
             except Exception as e:
                 return Response({'grafico': 'error'})

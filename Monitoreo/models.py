@@ -1,6 +1,6 @@
+import datetime
 from django.db.models import Q, Value, BooleanField, IntegerField
 from Persona.models import Supervisados, Tutores
-from django.db.models.functions import Concat
 from django.db import IntegrityError
 from django.db import transaction
 from Persona.image import Image
@@ -68,8 +68,11 @@ class PermisosObjetos(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'tutor_id' in request.GET and 'nombre_id' in request.GET:
-                objetos = Objetos.objects.filter(Q(pk__startswith = request.GET['nombre_id']) | Q(nombre__icontains = request.GET['nombre_id'])).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
+            if 'tutor_id' in request.GET:
+                if 'objeto_id' in request.GET:
+                    objetos = Objetos.objects.filter(pk = request.GET['objeto_id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
+                elif 'nombre' in request.GET:
+                    objetos = Objetos.objects.filter(nombre__icontains = request.GET['nombre']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
                 for i in range(len(objetos)):
                     permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
@@ -92,15 +95,18 @@ class PermisosObjetos(models.Model):
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if 'id' in json_data and 'tutor_id' in json_data:
+            if 'objeto_id' in json_data and 'tutor_id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.objeto = Objetos.objects.get(pk = json_data['id'])
+                self.objeto = Objetos.objects.get(pk = json_data['objeto_id'])
                 self.save()
                 return 'guardado'
             return 'error'
-        except Tutores.DoesNotExist or Objetos.DoesNotExist:
+        except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'No existe el tutor'
+        except Objetos.DoesNotExist:
+            transaction.savepoint_rollback(punto_guardado)
+            return 'No existe el objeto'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -108,7 +114,7 @@ class PermisosObjetos(models.Model):
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            self = PermisosObjetos.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(objeto_id = request.GET['id']))
+            self = PermisosObjetos.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(objeto_id = request.GET['objeto_id']))
             if(len(self)):
                 self[0].delete()
                 return 'eliminado'
@@ -124,8 +130,8 @@ class Monitoreo(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'tutor_id' in request.GET and 'id' in request.GET:
-                tipos_distraccion = TiposDistraccion.objects.filter(pk = request.GET['id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(monitoreo_id = Value(0, output_field = IntegerField())).values()
+            if 'tutor_id' in request.GET and 'tipo_dist_id' in request.GET:
+                tipos_distraccion = TiposDistraccion.objects.filter(pk = request.GET['tipo_dist_id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(monitoreo_id = Value(0, output_field = IntegerField())).values()
                 monitoreo_dis = Monitoreo.objects.filter(tutor_id = request.GET['tutor_id'])
                 for i in range(len(tipos_distraccion)):
                     monitoreo = monitoreo_dis.filter(tipo_distraccion_id = tipos_distraccion[i]['id'])
@@ -148,9 +154,9 @@ class Monitoreo(models.Model):
     def activar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if 'tutor_id' in json_data and 'id' in json_data:
+            if 'tutor_id' in json_data and 'tipo_dist_id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['id'])
+                self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_dist_id'])
                 self.save()
                 return 'activado'
             return 'error'
@@ -164,7 +170,7 @@ class Monitoreo(models.Model):
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            self = Monitoreo.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['id']))
+            self = Monitoreo.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['tipo_dist_id']))
             if(len(self)):
                 self[0].delete()
                 return 'desactivado'
@@ -180,56 +186,53 @@ class Historial(models.Model):
     supervisado = models.ForeignKey('Persona.Supervisados', on_delete = models.PROTECT, related_name = "historial_supervisado")
     tipo_distraccion = models.ForeignKey('Monitoreo.TiposDistraccion', on_delete = models.PROTECT, related_name = "historial_distraccion")
 
-    # Filtrar con >,<,>=,<=
-    # __lte -> Less than or equal
-    #  __gte -> Greater than or equal
-    #  __lt -> Less than
-    #  __gt -> Greater than
-    # QuerySet(foo__lte=10) # foo <= 10
-    # QuerySet(foo__gte=10) # foo >= 10
-    # QuerySet(foo__lt=10) # foo < 10
-    # QuerySet(foo__gt=10) # foo > 10
-
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'nombres_cedula' in request.GET and 'fecha' in request.GET and 'tutor_id' in request.GET:
-                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id']).select_related('persona')).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
-                supervisados = supervisados.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
-                historial = Historial.objects.filter(fecha_hora__lte = request.GET['fecha']).exclude(~Q(supervisado_id__in = supervisados.values('id')))
-            elif 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])
-                historial = Historial.objects.all().exclude(~Q(supervisado_id__in = supervisados.values('id')))
-            historial = historial.values('id', 'fecha_hora', 'observacion', 'imagen_evidencia', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos', 'supervisado__persona__cedula')
-            # Conversar con Jhon para ver si se envia de forma unitaria la foto de un historial mediante el id, y no todas las fotos de golpe
-            # file = Image()
-            # for u in range(len(historial)):
-            #     historial[u]['fecha_hora'] = historial[u]['fecha_hora'].strftime('%Y-%m-%d %H:%M')
-            #     if(historial[u]['imagen_evidencia'] != ''):
-            #         file.ruta = historial[u]['imagen_evidencia']
-            #         historial[u]['imagen_evidencia'] = file.get_base64()
-            return historial
+            # FILTRAR POR FECHA
+            if 'supervisado_id' in request.GET and 'fecha' in request.GET:
+                fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
+                fecha = fecha + datetime.timedelta(days = 1)
+                historial = Historial.objects.filter(Q(supervisado_id = request.GET['supervisado_id']) & Q(fecha_hora__lte = fecha)).values('id', 'fecha_hora', 'imagen_evidencia', 'observacion', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos')
+                return historial
+            elif 'historial_id' in request.GET:
+                historial = Historial.objects.get(pk = request.GET['historial_id'])
+                file = Image()
+                base64 = ''
+                if(historial.imagen_evidencia != ''):
+                    file.ruta = historial.imagen_evidencia
+                    base64 = file.get_base64()
+                json_historial =  [{
+                    'id': historial.pk,
+                    'fecha_hora': historial.fecha_hora,
+                    'imagen_evidencia': base64,
+                    'observacion': historial.observacion,
+                    'tipo_distraccion_id': historial.tipo_distraccion.pk,
+                    'tipo_distraccion__nombre': historial.tipo_distraccion.nombre,
+                    'supervisado_id': historial.supervisado.pk,
+                    'supervisado__persona__nombres': historial.supervisado.persona.nombres,
+                    'supervisado__persona__apellidos': historial.supervisado.persona.apellidos
+                }]
+                return json_historial
+            else:
+                return []
+        except Historial.DoesNotExist:
+            return 'No existe el historial'
         except Exception as e: 
-            return 'error'+str(e)
+            return 'error'
     
     @staticmethod
-    def grafico_expresion(request):
+    def graficos(request):
         try:
-            supervisados = Supervisados()
-            if 'nombres_cedula' in request.GET and 'tutor_id' in request.GET:
-                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
-                supervisados = supervisados.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
-            elif 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])
-            historial_grafico = []
-            for supervisado in supervisados: 
+            if 'supervisado_id' in request.GET and 'fecha' in request.GET:
+                supervisado = Supervisados.objects.get(pk = request.GET['supervisado_id'])
                 historial = supervisado.historial_supervisado.all().values()
                 if (len(historial)):
-                    object_json =  { 
-                    'supervisado_id': supervisado.pk,
-                    'nombres': supervisado.persona.nombres,
-                    'apellidos': supervisado.persona.apellidos,
-                    'cedula': supervisado.persona.cedula,
+                    fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
+                    fecha = fecha + datetime.timedelta(days = 1)
+                    historial_grafico = []
+                    historial = historial.filter(fecha_hora__lte = fecha)
+                    grafico_expresiones = { 
                     'enfadado': (historial.filter(observacion = 'Enfadado').count()),
                     'disgustado': (historial.filter(observacion = 'Disgustado').count()),
                     'temeroso': (historial.filter(observacion = 'Temeroso').count()),
@@ -238,31 +241,7 @@ class Historial(models.Model):
                     'triste': (historial.filter(observacion = 'Triste').count()),
                     'sorprendido': (historial.filter(observacion = 'Sorprendido').count())
                     }
-                    historial_grafico.append(object_json)
-            return historial_grafico
-        except Supervisados.DoesNotExist:    
-            return []
-        except Exception as e: 
-            return 'error'
-    
-    @staticmethod
-    def grafico_sueno(request):
-        try:
-            supervisados = Supervisados()
-            if 'nombres_cedula' in request.GET and 'tutor_id' in request.GET:
-                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
-                supervisados = supervisados.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
-            elif 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])
-            historial_grafico = []
-            for supervisado in supervisados: 
-                historial = supervisado.historial_supervisado.all().values()
-                if (len(historial)):
-                    object_json =  { 
-                    'supervisado_id': supervisado.pk,
-                    'nombres': supervisado.persona.nombres,
-                    'apellidos': supervisado.persona.apellidos,
-                    'cedula': supervisado.persona.cedula,
+                    grafico_sueno = { 
                     'semana8': 0,
                     'semana7': 0,
                     'semana6': 0,
@@ -272,31 +251,7 @@ class Historial(models.Model):
                     'semana2': 0,
                     'semana1': 0,
                     }
-                    historial_grafico.append(object_json)
-            return historial_grafico
-        except Supervisados.DoesNotExist:    
-            return []
-        except Exception as e: 
-            return 'error'
-            
-    @staticmethod
-    def grafico_objetos(request):
-        try:
-            supervisados = Supervisados()
-            if 'nombres_cedula' in request.GET and 'tutor_id' in request.GET:
-                supervisados = (Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])).annotate(nombres_completos = Concat('persona__nombres', Value(' '), 'persona__apellidos'))
-                supervisados = supervisados.filter(Q(nombres_completos__icontains = request.GET['nombres_cedula']) | Q(persona__cedula__icontains = request.GET['nombres_cedula']))
-            elif 'tutor_id' in request.GET:
-                supervisados = Supervisados.objects.filter(tutor__pk = request.GET['tutor_id'])
-            historial_grafico = []
-            for supervisado in supervisados: 
-                historial = supervisado.historial_supervisado.all().values()
-                if (len(historial)):
-                    object_json =  { 
-                    'supervisado_id': supervisado.pk,
-                    'nombres': supervisado.persona.nombres,
-                    'apellidos': supervisado.persona.apellidos,
-                    'cedula': supervisado.persona.cedula,
+                    grafico_objetos = { 
                     'semana8': 0,
                     'semana7': 0,
                     'semana6': 0,
@@ -306,9 +261,15 @@ class Historial(models.Model):
                     'semana2': 0,
                     'semana1': 0,
                     }
-                    historial_grafico.append(object_json)
-            return historial_grafico
+                    historial_grafico.append(grafico_expresiones)
+                    historial_grafico.append(grafico_sueno)
+                    historial_grafico.append(grafico_objetos)
+                    return historial_grafico
+                else:
+                    return []
+            else:
+                return []
         except Supervisados.DoesNotExist:    
-            return []
+            return 'No existe el supervisado'
         except Exception as e: 
             return 'error'

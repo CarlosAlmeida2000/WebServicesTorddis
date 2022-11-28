@@ -7,5 +7,5 @@ urlpatterns = [
     path('permisos-objeto/', views.vwPermisosObjetos.as_view()),
     path('tipos-distraccion/', views.vwTiposDistraccion.as_view()),
     path('historial/', views.vwHistorial.as_view()),
-    path('grafico/', views.vwGrafico.as_view()),
+    path('graficos/', views.vwGrafico.as_view()),
 ]

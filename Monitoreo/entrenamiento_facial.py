@@ -8,8 +8,9 @@ from .models import *
 
 class EntrenamientoFacial:
     def __init__(self, persona_id, camara_id):
-        self.supervisado = Supervisados.objects.get(persona_id = persona_id)
+        self.supervisado = None
         self.camara_id = camara_id
+        self.persona_id = persona_id
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
         self.etiquetas = []
@@ -22,6 +23,7 @@ class EntrenamientoFacial:
     
     def entrenar(self):
         try:
+            self.supervisado = Supervisados.objects.get(persona_id = self.persona_id)
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres, exist_ok = True)
             # se crean las 200 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
             cap = cv2.VideoCapture(0)
@@ -60,5 +62,7 @@ class EntrenamientoFacial:
             return 'entrenado'
         except Camaras.DoesNotExist:
             return 'La cámara no está registrada'
+        except Supervisados.DoesNotExist:
+            return 'No existe el supervisado'
         except Exception as e: 
-            return 'error'+str(e)
+            return 'error'

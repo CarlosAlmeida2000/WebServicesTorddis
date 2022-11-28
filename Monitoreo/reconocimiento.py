@@ -158,6 +158,7 @@ class Monitorizar:
                         # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
                         if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))):
                             rostro_48 = cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC)
+                            self.imagen_evidencia = video_color[y:y + h, x:x + w]
                             cropped_img = np.expand_dims(np.expand_dims(rostro_48, -1), 0)
                             prediction = self.modelo_expresiones.predict(cropped_img)
                             expresion = self.expresion_facial[int(np.argmax(prediction))]
