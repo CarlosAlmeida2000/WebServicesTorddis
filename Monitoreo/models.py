@@ -68,26 +68,34 @@ class PermisosObjetos(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            if 'tutor_id' in request.GET:
+            if 'tutor_id' in request.GET and ('objeto_id' in request.GET or 'nombre' in request.GET):
                 if 'objeto_id' in request.GET:
                     objetos = Objetos.objects.filter(pk = request.GET['objeto_id']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 elif 'nombre' in request.GET:
                     objetos = Objetos.objects.filter(nombre__icontains = request.GET['nombre']).annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
+                file = Image()
                 for i in range(len(objetos)):
                     permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
                     if(len(permiso)):
                         objetos[i]['habilitado'] = True
                         objetos[i]['permiso_objeto_id'] = permiso[0].id
+                    if objetos[i]['foto_objeto'] != '':
+                        file.ruta = objetos[i]['foto_objeto']
+                        objetos[i]['foto_objeto'] = file.get_base64()
                 return objetos
             elif 'tutor_id' in request.GET:
                 objetos = Objetos.objects.all().annotate(habilitado = Value(False, output_field = BooleanField())).annotate(permiso_objeto_id = Value(0, output_field = IntegerField())).values()
                 permisos_obj = PermisosObjetos.objects.filter(tutor_id = request.GET['tutor_id'])
+                file = Image()
                 for i in range(len(objetos)):
                     permiso = permisos_obj.filter(objeto_id = objetos[i]['id'])
                     if(len(permiso)):
                         objetos[i]['habilitado'] = True
                         objetos[i]['permiso_objeto_id'] = permiso[0].id
+                    if objetos[i]['foto_objeto'] != '':
+                        file.ruta = objetos[i]['foto_objeto']
+                        objetos[i]['foto_objeto'] = file.get_base64()
                 return objetos
         except Exception as e: 
             return 'error'
@@ -189,7 +197,6 @@ class Historial(models.Model):
     @staticmethod
     def obtener_datos(request):
         try:
-            # FILTRAR POR FECHA
             if 'supervisado_id' in request.GET and 'fecha' in request.GET:
                 fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
                 fecha = fecha + datetime.timedelta(days = 1)
