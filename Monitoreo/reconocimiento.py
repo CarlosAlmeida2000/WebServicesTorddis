@@ -40,7 +40,7 @@ class Monitorizar:
 
         # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas
         # Cargar el clasificador de detección de rostros pre entrenado de OpenCV
-        self.clasificador_haar = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
         # Cargar el modelo para el reconocimiento facial: El reconocimiento facial se realiza mediante el clasificador de distancia y vecino más cercano
         self.reconocedor_facial = cv2.face.LBPHFaceRecognizer_create()
         self.reconocedor_facial.read(self.ruta_modelos + 'reconocedor_facial.xml')

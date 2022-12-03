@@ -3,112 +3,120 @@
         "model": "Monitoreo.objetos",
         "pk": 1,
         "fields": {
-            "nombre": "Borrador"
+            "nombre": "Borrador",
+            "foto_objeto": "Objetos/borrador.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 2,
         "fields": {
-            "nombre": "Botella"
+            "nombre": "Botella",
+            "foto_objeto": "Objetos/botella.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 3,
         "fields": {
-            "nombre": "Celular"
+            "nombre": "Celular",
+            "foto_objeto": "Objetos/celular.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 4,
         "fields": {
-            "nombre": "Cuaderno"
+            "nombre": "Cuaderno",
+            "foto_objeto": "Objetos/cuaderno.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 5,
         "fields": {
-            "nombre": "Goma"
+            "nombre": "Lapicero",
+            "foto_objeto": "Objetos/lapicero.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 6,
         "fields": {
-            "nombre": "Lapicero"
+            "nombre": "Lápiz",
+            "foto_objeto": "Objetos/lapiz.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 7,
         "fields": {
-            "nombre": "Lápiz"
+            "nombre": "Laptop",
+            "foto_objeto": "Objetos/laptop.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 8,
         "fields": {
-            "nombre": "Laptop"
+            "nombre": "Lente",
+            "foto_objeto": "Objetos/lente.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 9,
         "fields": {
-            "nombre": "Lente"
+            "nombre": "Mochila",
+            "foto_objeto": "Objetos/mochila.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 10,
         "fields": {
-            "nombre": "Mochila"
+            "nombre": "Plato",
+            "foto_objeto": "Objetos/plato.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 11,
         "fields": {
-            "nombre": "Plato"
+            "nombre": "Regla",
+            "foto_objeto": "Objetos/regla.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 12,
         "fields": {
-            "nombre": "Regla"
+            "nombre": "Sacapunta",
+            "foto_objeto": "Objetos/sacapunta.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 13,
         "fields": {
-            "nombre": "Sacapunta"
+            "nombre": "Tijera",
+            "foto_objeto": "Objetos/tijera.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 14,
         "fields": {
-            "nombre": "Tijera"
+            "nombre": "Memoria usb",
+            "foto_objeto": "Objetos/usb.png"
         }
     },
     {
         "model": "Monitoreo.objetos",
         "pk": 15,
         "fields": {
-            "nombre": "Memoria usb"
-        }
-    },
-    {
-        "model": "Monitoreo.objetos",
-        "pk": 16,
-        "fields": {
-            "nombre": "Vaso"
+            "nombre": "Vaso",
+            "foto_objeto": "Objetos/vaso.png"
         }
     }
 ]

@@ -240,6 +240,7 @@ class Historial(models.Model):
                     historial_grafico = []
                     historial = historial.filter(fecha_hora__lte = fecha)
                     grafico_expresiones = { 
+                    'tipo_grafico': 'Expresiones',
                     'enfadado': (historial.filter(observacion = 'Enfadado').count()),
                     'disgustado': (historial.filter(observacion = 'Disgustado').count()),
                     'temeroso': (historial.filter(observacion = 'Temeroso').count()),
@@ -249,24 +250,24 @@ class Historial(models.Model):
                     'sorprendido': (historial.filter(observacion = 'Sorprendido').count())
                     }
                     grafico_sueno = { 
-                    'semana8': 0,
-                    'semana7': 0,
-                    'semana6': 0,
-                    'semana5': 0,
-                    'semana4': 0,
-                    'semana3': 0,
-                    'semana2': 0,
-                    'semana1': 0,
+                    'tipo_grafico': 'Sueño',
+                    'dia_7': 0,
+                    'dia_6': 0,
+                    'dia_5': 0,
+                    'dia_4': 0,
+                    'dia_3': 0,
+                    'dia_2': 0,
+                    'dia_1': 0,
                     }
                     grafico_objetos = { 
-                    'semana8': 0,
-                    'semana7': 0,
-                    'semana6': 0,
-                    'semana5': 0,
-                    'semana4': 0,
-                    'semana3': 0,
-                    'semana2': 0,
-                    'semana1': 0,
+                    'tipo_grafico': 'Objetos',
+                    'dia_7': 0,
+                    'dia_6': 0,
+                    'dia_5': 0,
+                    'dia_4': 0,
+                    'dia_3': 0,
+                    'dia_2': 0,
+                    'dia_1': 0,
                     }
                     historial_grafico.append(grafico_expresiones)
                     historial_grafico.append(grafico_sueno)

@@ -1,10 +1,10 @@
-import os
 from Persona.models import Personas
-import cv2
-import imutils
-import numpy as np
 from urllib.request import urlopen
 from .models import *
+import numpy as np
+import imutils
+import cv2
+import os
 
 class EntrenamientoFacial:
     def __init__(self, persona_id, camara_id):
@@ -16,7 +16,7 @@ class EntrenamientoFacial:
         self.etiquetas = []
         self.datos_rostros = []
         self.cont_etiquetas = 0
-        self.clasificador_haar = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
         self.imagenes_capturar = 200
         self.cont_imagenes = 0
         self.byte = bytes()
