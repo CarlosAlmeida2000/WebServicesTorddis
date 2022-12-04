@@ -1,8 +1,15 @@
-0 lapicero
-1 mochila
-2 regla
-3 sacapunta
-4 cuaderno
-5 usb
-6 lapiz
-7 borrador
+0 Borrador
+1 Botella
+2 Celular
+3 Cuaderno
+4 Lapicero
+5 Lápiz
+6 Laptop
+7 Lente
+8 Mochila
+9 Plato
+10 Regla
+11 Sacapunta
+12 Tijera
+13 Memoria usb
+14 Vaso
