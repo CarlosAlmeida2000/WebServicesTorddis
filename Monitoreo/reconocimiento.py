@@ -24,7 +24,6 @@ class Monitorizar:
         self.tutor_id = tutor_id
         self.byte = bytes()
         # --- Reloj para el registro de un historial
-        self.reg_ini_persona = True
         self.reg_ini_expresion = True
         # tiempo de registro de historial en segundos
         self.tiempo_registro = 30
@@ -126,7 +125,6 @@ class Monitorizar:
     def guardarHistorial(self, observacion, tipo_distraccion_id):
         try:
             if self.supervisado != '':
-                print("llegaaaaaaaaaaaaaaaaaaaaaa")
                 from .models import Historial, TiposDistraccion
                 self.historial = Historial()
                 self.historial.fecha_hora = datetime.now()
@@ -138,7 +136,6 @@ class Monitorizar:
                 file = ContentFile(frame_jpg[1]) 
                 self.historial.imagen_evidencia.save('dis_' + str(tipo_distraccion_id) + '_id_' + str(self.historial.supervisado.persona.id) + '_' + str(self.historial.fecha_hora) + '.png', file, save = True)
                 self.historial.save()
-                print("registraaaaaaaaaaaaaaaaaaaa")
         except Exception as e:
             pass
     
@@ -148,6 +145,9 @@ class Monitorizar:
         minutos = int(segundos / 60)
         segundos -= minutos * 60
         return f"{minutos}:{int(segundos)}"
+
+    def obtener_rostros(self, imagen):
+        return self.clasificador_haar.detectMultiScale(cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY), scaleFactor = 1.3, minNeighbors = 5)
 
     def reconocer(self):
         try:
@@ -166,10 +166,12 @@ class Monitorizar:
                 # Copia del video a color para caputurar la imagen que se guardará en el historial
                 video_color = video.copy()
                 # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
-                rostros = self.clasificador_haar.detectMultiScale(gray, scaleFactor = 1.3, minNeighbors = 5)
-                # Recorriendo rostros 
+                rostros = self.obtener_rostros(video)
+                # Recorriendo cada rostro
                 for (x, y, w, h) in rostros:
                     rostro = gray[y:y + h, x:x + w]
+
+
                     # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se realiza el reconocimiento facial para verificar si es una persona registrada
                     rostro_150 = cv2.resize(rostro, (150, 150), interpolation = cv2.INTER_CUBIC)
                     self.persona_identif = self.reconocedor_facial.predict(rostro_150)
@@ -185,12 +187,14 @@ class Monitorizar:
                                 self.reloj_personas = time.time()
                             cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                             cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
+                            # Se captura la imagen de la persona desconocida
                             self.imagen_evidencia = video_color[y:y + h, x:x + w]
-                            if (round(time.time() - self.reloj_personas, 0) >= self.tiempo_registro or self.reg_ini_persona):
-                                # Se captura la imagen de la persona desconocida
+                            if (round(time.time() - self.reloj_personas, 0) >= self.tiempo_registro):
                                 self.reloj_personas = 0
-                                self.reg_ini_persona = False
-                                self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id)
+                                if(len(self.obtener_rostros(self.imagen_evidencia))):
+                                    self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id)
+
+
                     # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
                     if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))) and self.supervisado != '':
                         if self.reloj_expresiones == 0:
@@ -201,6 +205,7 @@ class Monitorizar:
                         prediction = self.modelo_expresiones.predict(cropped_img)
                         expresion = self.expresion_facial[int(np.argmax(prediction))]
                         supervisado_id = self.supervisado.split('_')[0]
+                        # Mejorar precisión del reconocimiento de expresiones, después de estar analizando durante 15 segundos se escoge la expresión con mayor manifestación
                         contador_expresion = 1
                         if self.expresiones_recono.get(supervisado_id, -1) != -1:
                             if self.expresiones_recono.get(supervisado_id, -1).get(expresion, -1) != -1:
@@ -211,27 +216,22 @@ class Monitorizar:
                                 self.expresiones_recono.get(supervisado_id, -1).update({expresion: 1})
                         else:
                             self.expresiones_recono = {supervisado_id: {expresion: 1}}
-
-
-                        print(self.expresiones_recono)
-                        # seleccionar la expresion de mayor ocurrencia
-
+                        emociones = self.expresiones_recono.get(supervisado_id, -1)
+                        expresion = max(emociones, key=emociones.get)
                         cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                        if (round(time.time() - self.reloj_expresiones, 0) >= self.tiempo_registro or self.reg_ini_expresion):
-                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(observacion = expresion)).order_by('-fecha_hora'))
-                            if(len(ultimo_historial)):
-                                fecha_historial = datetime.strptime(ultimo_historial[0].fecha_hora.strftime('%Y-%m-%d %H:%M:%S.%f') , '%Y-%m-%d %H:%M:%S.%f')
-                                if ((datetime.now() - fecha_historial).seconds > self.tiempo_registro):
-                                    self.reloj_expresiones = 0
-                                    self.reg_ini_expresion = False
-                                    self.expresiones_recono = {}
+                        if (round(time.time() - self.reloj_expresiones, 0) >= (self.tiempo_registro - 15) or self.reg_ini_expresion):
+                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))[0]
+                            # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
+                            if(ultimo_historial.observacion != expresion):
+                                self.reloj_expresiones = 0
+                                self.reg_ini_expresion = False
+                                self.expresiones_recono = {}
+                                if(len(self.obtener_rostros(self.imagen_evidencia))):
                                     self.guardarHistorial(expresion, self.dis_expre_id)
                             else:
                                 self.reloj_expresiones = 0
                                 self.reg_ini_expresion = False
                                 self.expresiones_recono = {}
-                                print("nuevo cambiooooooo")
-                                self.guardarHistorial(expresion, self.dis_expre_id)
 
 
                     # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
@@ -272,9 +272,13 @@ class Monitorizar:
                                             # Temporizador
                                             self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
                                             if self.tiempo_dormido >= self.sueno_permitido:
-                                                self.guardarHistorial('Presencia de sueño, durmió un tiempo de {0} / minutos:segundos'.format(self.convertir_min_seg(self.tiempo_dormido)), self.dis_suen_id)
                                                 self.inicio_sueno = 0
                                                 self.cant_parpadeos = 0
+                                                if(len(self.obtener_rostros(self.imagen_evidencia))):
+                                                    self.guardarHistorial('Presencia de sueño, durmió un tiempo de {0} / minutos:segundos'.format(self.convertir_min_seg(self.tiempo_dormido)), self.dis_suen_id)
+                                                
+
+
                     # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
                     if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_obj_id))):
                         frame = cv2.flip(video, 1)
@@ -289,7 +293,14 @@ class Monitorizar:
                         for i in range(len(prediction[0])):
                             # Solo mostrar objetos que tengan una precisión a partir del 40 %
                             if (prediction[0][i] >= 0.40):
-                                cv2.putText(video, str(self.labels[i]) + ' - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                objeto = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
+                                if len(objeto):
+                                    cv2.putText(video, str(self.labels[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                else:
+                                    self.imagen_evidencia = video_color
+                                    self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels[i]), self.dis_obj_id)
+                                    cv2.putText(video, str(self.labels[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
                             
                 cv2.imshow('Video', video)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
