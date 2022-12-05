@@ -33,18 +33,6 @@ class vwCamara(APIView):
             except Exception as e: 
                 return Response({'camara': 'error'})
 
-    def delete(self, request, format = None):
-        if request.method == 'DELETE':
-            try:
-                if 'id' in request.GET:
-                    camara = Camaras.objects.get(Q(pk = request.GET['id']) & Q(tutor_id = request.GET['tutor_id']))
-                camara.delete()
-                return Response({'camara': 'eliminada'})
-            except Camaras.DoesNotExist:
-                return Response({'camara': 'error'})
-            except Exception as e: 
-                return Response({'camara': 'error'})
-
 class vwEntrenamientoFacial(APIView):
 
     def get(self, request, format = None):

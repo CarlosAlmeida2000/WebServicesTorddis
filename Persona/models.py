@@ -167,7 +167,7 @@ class Supervisados(models.Model):
                 self.persona = Personas()
             # Calcular edad del supervisado
             anios, meses, dias = Personas.calcular_edad(json_data['persona__fecha_nacimiento'])
-            if anios <= 18:
+            if anios <= 12:
                 persona_guardada, self.persona = self.persona.guardar(json_data)
                 if(persona_guardada == 'si'):
                     self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])    
@@ -176,7 +176,7 @@ class Supervisados(models.Model):
                 else:
                     return persona_guardada  
             else:
-                return 'Edad máxima 18 años'  
+                return 'Edad máxima 12 años'  
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'

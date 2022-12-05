@@ -1,6 +1,4 @@
 {
-    "direccion_ip": "192.168.0.104:51",
-    "nombre_camara": "CAM-01",
-    "habilitada": true,
+    "direccion_ruta": "192.168.0.104:51",
     "tutor_id": 1
 }

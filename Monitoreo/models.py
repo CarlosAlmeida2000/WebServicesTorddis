@@ -12,8 +12,7 @@ class TiposDistraccion(models.Model):
     nombre = models.CharField(max_length = 25)
 
 class Camaras(models.Model):
-    direccion_ip = models.CharField(max_length = 100, unique = True)
-    nombre_camara = models.CharField(max_length = 20)
+    direccion_ruta = models.CharField(max_length = 150, unique = True)
     habilitada = models.BooleanField()
     tutor = models.ForeignKey('Persona.Tutores', on_delete = models.PROTECT, related_name = "camaras_tutor")
 
@@ -22,11 +21,9 @@ class Camaras(models.Model):
         try:
             if 'id' in request.GET and 'tutor_id' in request.GET:
                 camaras = Camaras.objects.filter(Q(pk = request.GET['id']) & Q(tutor_id = request.GET['tutor_id']))   
-            elif 'nombre_camara' in request.GET and 'tutor_id' in request.GET:
-                camaras = Camaras.objects.filter(Q(nombre_camara__icontains = request.GET['nombre_camara']) & Q(tutor_id = request.GET['tutor_id']))   
             elif 'tutor_id' in request.GET:
                 camaras = Camaras.objects.filter(tutor_id = request.GET['tutor_id'])
-            camaras = camaras.order_by('tutor_id').select_related('tutor').values('id', 'direccion_ip', 'nombre_camara', 'habilitada', 'tutor_id')
+            camaras = camaras.order_by('tutor_id').select_related('tutor').values('id', 'direccion_ruta', 'habilitada', 'tutor_id')
             return camaras
         except Exception as e: 
             return 'error'
@@ -34,17 +31,14 @@ class Camaras(models.Model):
     def guardar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if 'direccion_ip' in json_data:
-                self.direccion_ip = json_data['direccion_ip']
-            if 'nombre_camara' in json_data:
-                self.nombre_camara = json_data['nombre_camara']
-            if 'habilitada' in json_data:
-                self.habilitada = json_data['habilitada']
+            if 'direccion_ruta' in json_data:
+                self.direccion_ruta = json_data['direccion_ruta']
+                self.habilitada = True
             if 'tutor_id' in json_data:
                 self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-            existe_camara = Camaras.objects.filter(Q(tutor_id = self.tutor.pk) & Q(nombre_camara = self.nombre_camara))
-            if(len(existe_camara)) and not existe_camara[0].pk == self.pk:
-                return 'cámara repetida'    
+            tiene_camara = Camaras.objects.filter(tutor_id = self.tutor.pk)
+            if(len(tiene_camara)) and not tiene_camara[0].pk == self.pk:
+                return 'El tutor ya tiene una cámara'    
             self.save()
             return 'guardada'
         except IntegrityError:
