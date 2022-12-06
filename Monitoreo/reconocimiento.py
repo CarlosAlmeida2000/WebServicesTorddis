@@ -115,10 +115,9 @@ class Monitorizar:
         # Crear el array de la forma adecuada para alimentar el modelo keras con las imágenes de 224 x 244 pixeles
         self.data_entrena_objet = np.ndarray(shape = (1, 224, 224, 3), dtype = np.float32)
         # Cargar las clases de objetos
-        self.labels = list()
-        file_labels = open(self.ruta_modelos + 'labels.txt', 'r')
-        for i in file_labels: 
-            self.labels.append(i.split()[1])
+        self.labels_objetos = list()
+        for i in open(self.ruta_modelos + 'labels.txt', 'r'): 
+            self.labels_objetos.append(i.split()[1])
 
 
     # se registra un historial de la monitorización
@@ -217,21 +216,28 @@ class Monitorizar:
                         else:
                             self.expresiones_recono = {supervisado_id: {expresion: 1}}
                         emociones = self.expresiones_recono.get(supervisado_id, -1)
-                        expresion = max(emociones, key=emociones.get)
+                        expresion = max(emociones, key = emociones.get)
                         cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                         if (round(time.time() - self.reloj_expresiones, 0) >= (self.tiempo_registro - 15) or self.reg_ini_expresion):
-                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))[0]
+                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
                             # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
-                            if(ultimo_historial.observacion != expresion):
+                            if(len(ultimo_historial)):
+                                if(ultimo_historial[0].observacion != expresion):
+                                    self.reloj_expresiones = 0
+                                    self.reg_ini_expresion = False
+                                    self.expresiones_recono = {}
+                                    if(len(self.obtener_rostros(self.imagen_evidencia))):
+                                        self.guardarHistorial(expresion, self.dis_expre_id)
+                                else:
+                                    self.reloj_expresiones = 0
+                                    self.reg_ini_expresion = False
+                                    self.expresiones_recono = {}
+                            else:
                                 self.reloj_expresiones = 0
                                 self.reg_ini_expresion = False
                                 self.expresiones_recono = {}
                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                     self.guardarHistorial(expresion, self.dis_expre_id)
-                            else:
-                                self.reloj_expresiones = 0
-                                self.reg_ini_expresion = False
-                                self.expresiones_recono = {}
 
 
                     # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
@@ -293,13 +299,13 @@ class Monitorizar:
                         for i in range(len(prediction[0])):
                             # Solo mostrar objetos que tengan una precisión a partir del 40 %
                             if (prediction[0][i] >= 0.40):
-                                objeto = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
-                                if len(objeto):
-                                    cv2.putText(video, str(self.labels[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
+                                if len(tiene_permiso):
+                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                                 else:
                                     self.imagen_evidencia = video_color
-                                    self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels[i]), self.dis_obj_id)
-                                    cv2.putText(video, str(self.labels[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                    self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
+                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
                             
                 cv2.imshow('Video', video)

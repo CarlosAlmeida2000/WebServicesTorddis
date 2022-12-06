@@ -217,9 +217,9 @@ class Historial(models.Model):
             else:
                 return []
         except Historial.DoesNotExist:
-            return 'No existe el historial'
+            return {'historial': 'No existe el historial'}
         except Exception as e: 
-            return 'error'
+            return {'historial': 'error'}
     
     @staticmethod
     def graficos(request):
@@ -271,6 +271,6 @@ class Historial(models.Model):
             else:
                 return []
         except Supervisados.DoesNotExist:    
-            return 'No existe el supervisado'
+            return {'grafico': 'No existe el supervisado'}
         except Exception as e: 
-            return 'error'
+            return {'grafico': 'error'}
