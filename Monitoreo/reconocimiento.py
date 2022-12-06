@@ -20,16 +20,21 @@ class Monitorizar:
         self.lista_supervisados = []
         self.expresiones_recono = {}
         self.imagen_evidencia = None
+        self.personas_desconocidas = 0
+        self.reconocer_personas = False
         self.supervisado = ''
         self.tutor_id = tutor_id
         self.byte = bytes()
         # --- Reloj para el registro de un historial
-        self.reg_ini_expresion = True
         # tiempo de registro de historial en segundos
         self.tiempo_registro = 30
-        # tiempo en el que aparece una persona desconocida
-        self.reloj_personas = 0
-        # tiempo en el que cambia una expresion facial
+        # tiempo de espera en ausencia de un supervisado en segundos
+        self.tiempo_espera_sup = 60
+        # tiempo de inicio que aparece una persona desconocida
+        self.reloj_desconocido = 0
+        # tiempo de inicio que un supervisado se ausenta
+        self.reloj_supervisado = -1
+        # tiempo de inicio de una expresion facial
         self.reloj_expresiones = 0
         # --- ID de los tipos de distraccion
         # 1. Reconocer persona
@@ -166,6 +171,17 @@ class Monitorizar:
                 video_color = video.copy()
                 # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
                 rostros = self.obtener_rostros(video)
+
+                self.reconocer_personas = True if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) else False
+
+                # Si hay un tiempo de inicio que desapareció el supervisado y este no aparece durante el tiempo de espera configurado, se registra el historial
+                if (self.reconocer_personas and self.reloj_supervisado > 0 and (round(time.time() - self.reloj_supervisado, 0) >= self.tiempo_espera_sup)):
+                    self.imagen_evidencia = video_color
+                    self.reloj_supervisado = -1
+                    print('El menor no se encuentra en el área de estudio')
+#                    self.guardarHistorial('El menor no se encuentra en el área de estudio', self.dis_pers_id)
+                self.personas_desconocidas = 0
+
                 # Recorriendo cada rostro
                 for (x, y, w, h) in rostros:
                     rostro = gray[y:y + h, x:x + w]
@@ -181,15 +197,16 @@ class Monitorizar:
                         cv2.rectangle(video, (x, y), (x + w, y + h), (0, 255, 0), 2)
                         cv2.rectangle(video, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
                     else:
-                        if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) and self.supervisado != '':
-                            if self.reloj_personas == 0:
-                                self.reloj_personas = time.time()
+                        if self.reconocer_personas and self.supervisado != '':
+                            if self.reloj_desconocido == 0:
+                                self.reloj_desconocido = time.time()
+                            self.personas_desconocidas += 1
                             cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                             cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
                             # Se captura la imagen de la persona desconocida
                             self.imagen_evidencia = video_color[y:y + h, x:x + w]
-                            if (round(time.time() - self.reloj_personas, 0) >= self.tiempo_registro):
-                                self.reloj_personas = 0
+                            if (round(time.time() - self.reloj_desconocido, 0) >= self.tiempo_registro):
+                                self.reloj_desconocido = 0
                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                     self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id)
 
@@ -218,23 +235,20 @@ class Monitorizar:
                         emociones = self.expresiones_recono.get(supervisado_id, -1)
                         expresion = max(emociones, key = emociones.get)
                         cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                        if (round(time.time() - self.reloj_expresiones, 0) >= (self.tiempo_registro - 15) or self.reg_ini_expresion):
+                        if (round(time.time() - self.reloj_expresiones, 0) >= (self.tiempo_registro - 15)):
                             ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
                             # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
                             if(len(ultimo_historial)):
                                 if(ultimo_historial[0].observacion != expresion):
                                     self.reloj_expresiones = 0
-                                    self.reg_ini_expresion = False
                                     self.expresiones_recono = {}
                                     if(len(self.obtener_rostros(self.imagen_evidencia))):
                                         self.guardarHistorial(expresion, self.dis_expre_id)
                                 else:
                                     self.reloj_expresiones = 0
-                                    self.reg_ini_expresion = False
                                     self.expresiones_recono = {}
                             else:
                                 self.reloj_expresiones = 0
-                                self.reg_ini_expresion = False
                                 self.expresiones_recono = {}
                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                     self.guardarHistorial(expresion, self.dis_expre_id)
@@ -263,7 +277,7 @@ class Monitorizar:
                                         x3, y3 = self.puntos_faciales[374][1:]
                                         x4, y4 = self.puntos_faciales[386][1:]
                                         longitud2 = math.hypot(x4 - x3, y4 -y3)
-                                        cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (30, 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                                        cv2.putText(video, f'Parpadeos: {int(self.cant_parpadeos)}', (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                                         # Contar parpadeos
                                         if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
                                             # Cerró los ojos
@@ -301,16 +315,30 @@ class Monitorizar:
                             if (prediction[0][i] >= 0.40):
                                 tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
                                 if len(tiene_permiso):
-                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                                 else:
                                     self.imagen_evidencia = video_color
                                     self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
-                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 40 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
-                            
-                cv2.imshow('Video', video)
+                if self.reconocer_personas:
+                    # Si todos los rostros son desconocidos, pero antes si hubo un supervisado, se inicio el cronómetro
+                    if self.reloj_supervisado == -1 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas) and self.supervisado != '':
+                        self.reloj_supervisado = time.time()            
+                    elif len(rostros) != self.personas_desconocidas and self.reloj_supervisado > 0:
+                        self.reloj_supervisado = -1
+                    # Mostrar mensaje de presencia / ausencia
+                    if self.reloj_supervisado == -1:
+                        cv2.putText(video, 'Supervisado presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                    else:
+                        cv2.putText(video, 'Se fue el supervisado, inicia conteoooo !!!!', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                    
+                # Detener el proceso de monitoreo                
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+                pass
+
+                cv2.imshow('Video', video)
             cv2.destroyAllWindows()
         except Exception as e: 
             print(str(e))
