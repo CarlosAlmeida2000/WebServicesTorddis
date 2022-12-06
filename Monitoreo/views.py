@@ -46,7 +46,7 @@ class vwEntrenamientoFacial(APIView):
         if request.method == 'PUT':
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
-                entrenar_rostros = EntrenamientoFacial(json_data['persona_id'], json_data['camara_id'])
+                entrenar_rostros = EntrenamientoFacial(json_data['supervisado_id'])
                 return Response({'entrenamiento_facial': entrenar_rostros.entrenar()})
             except Exception as e: 
                 return Response({'entrenamiento_facial': 'error'})
@@ -89,22 +89,12 @@ class vwTiposDistraccion(APIView):
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
                 monitoreo = Monitoreo()
-                return Response({'monitoreo': monitoreo.activar(json_data)})
-            except Exception as e: 
-                return Response({'monitoreo': 'error'})
-
-    def put(self, request, format = None):
-        if request.method == 'PUT':
-            try:
-                monitoreo = Monitorizar(tutor_id = 1)
-                hilo_vigilar = threading.Thread(target=monitoreo.reconocer)
-                hilo_vigilar.start()
-                # POR CADA CAMARA HABILITADA SE CREA UN HILO DE VIGILANCIA 
-                    # for camara in Camaras.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(habilitada = True)):
-                    #     monitoreo = Monitorizar()
-                    #     hilo_vigilar = threading.Thread(target=monitoreo.reconocer, args=(camara.direccion_ip,))
-                    #     hilo_vigilar.start()
-                return Response({'monitoreo': 'monitoreando........'})
+                respuesta = monitoreo.activar(json_data)
+                if respuesta == 'activado':
+                    vigilar = Monitorizar(tutor_id = json_data['tutor_id'])
+                    hilo_vigilar = threading.Thread(target = vigilar.reconocer)
+                    hilo_vigilar.start()
+                return Response({'monitoreo': respuesta})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 

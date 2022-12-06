@@ -155,7 +155,7 @@ class Monitorizar:
             # CUANDO SE PRUEBE CON EL DISPOSITIVO, AJUSTAR ABAJO LAS LONGITUDES CUANDO SE CIERRA Y ABRE UN OJO, 14 ES CUANDO SE USA LA RESOLUCION DE 1280 X 720
             cap.set(3, 1280) # ancho ventana
             cap.set(6, 720) # alto ventana
-            while True:
+            while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
                 ret, video = cap.read()
                 if not ret:
                     break

@@ -1,11 +1,10 @@
-import datetime
 from django.db.models import Q, Value, BooleanField, IntegerField
 from Persona.models import Supervisados, Tutores
 from django.db import IntegrityError
 from django.db import transaction
 from Persona.image import Image
 from django.db import models
-import threading
+import threading, datetime
 
 # Create your models here.
 class TiposDistraccion(models.Model):

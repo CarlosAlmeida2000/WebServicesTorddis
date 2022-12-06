@@ -7,10 +7,9 @@ import cv2
 import os
 
 class EntrenamientoFacial:
-    def __init__(self, persona_id, camara_id):
+    def __init__(self, supervisado_id):
         self.supervisado = None
-        self.camara_id = camara_id
-        self.persona_id = persona_id
+        self.supervisado_id = supervisado_id
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
         self.etiquetas = []
@@ -23,7 +22,7 @@ class EntrenamientoFacial:
     
     def entrenar(self):
         try:
-            self.supervisado = Supervisados.objects.get(persona_id = self.persona_id)
+            self.supervisado = Supervisados.objects.get(pk = self.supervisado_id)
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres, exist_ok = True)
             # se crean las 200 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
             cap = cv2.VideoCapture(0)
@@ -40,8 +39,10 @@ class EntrenamientoFacial:
                     cv2.rectangle(video, (x, y),(x + w, y + h),(0, 255, 0), 2)
                     rostro = auxFrame[y:y + h, x:x + w]
                     rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
-                    cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
-                    self.cont_imagenes += 1
+                    existe_rostro = self.clasificador_haar.detectMultiScale(cv2.cvtColor(rostro, cv2.COLOR_BGR2GRAY), scaleFactor = 1.3, minNeighbors = 5)
+                    if(len(existe_rostro)):
+                        cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
+                        self.cont_imagenes += 1
                 cv2.imshow('Video', cv2.resize(video,(1500, 760), interpolation = cv2.INTER_CUBIC))
                 k =  cv2.waitKey(1)
                 if k == 27 or self.cont_imagenes >= self.imagenes_capturar:
