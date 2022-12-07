@@ -101,7 +101,7 @@ class Tutores(models.Model):
             return 'usuario repetido'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
 
     @staticmethod
     def login(json_data):

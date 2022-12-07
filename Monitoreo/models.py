@@ -191,8 +191,7 @@ class Historial(models.Model):
     def obtener_datos(request):
         try:
             if 'supervisado_id' in request.GET and 'fecha' in request.GET:
-                fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
-                fecha = fecha + datetime.timedelta(days = 1)
+                fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date() + datetime.timedelta(days = 1)
                 historial = Historial.objects.filter(Q(supervisado_id = request.GET['supervisado_id']) & Q(fecha_hora__lte = fecha)).values('id', 'fecha_hora', 'imagen_evidencia', 'observacion', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos')
                 return historial
             elif 'historial_id' in request.GET:
@@ -231,37 +230,29 @@ class Historial(models.Model):
                     fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
                     fecha = fecha + datetime.timedelta(days = 1)
                     historial_grafico = []
-                    historial = historial.filter(fecha_hora__lte = fecha)
+                    historial_expresiones = historial.filter(fecha_hora__lte = fecha)
                     grafico_expresiones = { 
                     'tipo_grafico': 'Expresiones',
-                    'enfadado': (historial.filter(observacion = 'Enfadado').count()),
-                    'disgustado': (historial.filter(observacion = 'Disgustado').count()),
-                    'temeroso': (historial.filter(observacion = 'Temeroso').count()),
-                    'feliz': (historial.filter(observacion = 'Feliz').count()),
-                    'neutral': (historial.filter(observacion = 'Neutral').count()),
-                    'triste': (historial.filter(observacion = 'Triste').count()),
-                    'sorprendido': (historial.filter(observacion = 'Sorprendido').count())
+                    'enfadado': (historial_expresiones.filter(observacion = 'Enfadado').count()),
+                    'disgustado': (historial_expresiones.filter(observacion = 'Disgustado').count()),
+                    'temeroso': (historial_expresiones.filter(observacion = 'Temeroso').count()),
+                    'feliz': (historial_expresiones.filter(observacion = 'Feliz').count()),
+                    'neutral': (historial_expresiones.filter(observacion = 'Neutral').count()),
+                    'triste': (historial_expresiones.filter(observacion = 'Triste').count()),
+                    'sorprendido': (historial_expresiones.filter(observacion = 'Sorprendido').count())
                     }
                     grafico_sueno = { 
-                    'tipo_grafico': 'Sueño',
-                    'dia_7': 0,
-                    'dia_6': 0,
-                    'dia_5': 0,
-                    'dia_4': 0,
-                    'dia_3': 0,
-                    'dia_2': 0,
-                    'dia_1': 0,
+                        'tipo_grafico': 'Sueño'
                     }
                     grafico_objetos = { 
-                    'tipo_grafico': 'Objetos',
-                    'dia_7': 0,
-                    'dia_6': 0,
-                    'dia_5': 0,
-                    'dia_4': 0,
-                    'dia_3': 0,
-                    'dia_2': 0,
-                    'dia_1': 0,
+                    'tipo_grafico': 'Objetos'
                     }
+                    for i in range(7):
+                        fecha = fecha - datetime.timedelta(days = (i + 1))
+                        historial_diario = historial.filter(fecha_hora__range = [str(fecha) + ' 00:00:00.000000', str(fecha) + ' 23:59:59.000000'])
+                        grafico_sueno[f'dia_{(i+1)}'] = historial_diario.filter(tipo_distraccion_id = 3).count()
+                        grafico_objetos[f'dia_{(i+1)}'] = historial_diario.filter(tipo_distraccion_id = 4).count()
+                            
                     historial_grafico.append(grafico_expresiones)
                     historial_grafico.append(grafico_sueno)
                     historial_grafico.append(grafico_objetos)

@@ -21,6 +21,7 @@ class Monitorizar:
         self.expresiones_recono = {}
         self.imagen_evidencia = None
         self.personas_desconocidas = 0
+        self.es_desconocido = False
         self.reconocer_personas = False
         self.supervisado = ''
         self.tutor_id = tutor_id
@@ -159,6 +160,7 @@ class Monitorizar:
             # CUANDO SE PRUEBE CON EL DISPOSITIVO, AJUSTAR ABAJO LAS LONGITUDES CUANDO SE CIERRA Y ABRE UN OJO, 14 ES CUANDO SE USA LA RESOLUCION DE 1280 X 720
             cap.set(3, 1280) # ancho ventana
             cap.set(6, 720) # alto ventana
+            
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
                 ret, video = cap.read()
                 if not ret:
@@ -171,17 +173,13 @@ class Monitorizar:
                 video_color = video.copy()
                 # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
                 rostros = self.obtener_rostros(video)
-
                 self.reconocer_personas = True if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) else False
-
                 # Si hay un tiempo de inicio que desapareció el supervisado y este no aparece durante el tiempo de espera configurado, se registra el historial
                 if (self.reconocer_personas and self.reloj_supervisado > 0 and (round(time.time() - self.reloj_supervisado, 0) >= self.tiempo_espera_sup)):
                     self.imagen_evidencia = video_color
                     self.reloj_supervisado = -1
-                    print('El menor no se encuentra en el área de estudio')
-#                    self.guardarHistorial('El menor no se encuentra en el área de estudio', self.dis_pers_id)
+                    self.guardarHistorial('El menor no se encuentra en el área de estudio', self.dis_pers_id)
                 self.personas_desconocidas = 0
-
                 # Recorriendo cada rostro
                 for (x, y, w, h) in rostros:
                     rostro = gray[y:y + h, x:x + w]
@@ -193,6 +191,7 @@ class Monitorizar:
                     if self.persona_identif[1] < 70:
                         # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
                         self.supervisado = self.lista_supervisados[self.persona_identif[0]]
+                        self.es_desconocido = False
                         cv2.putText(video,'{}'.format(self.supervisado.split('_')[1]), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
                         cv2.rectangle(video, (x, y), (x + w, y + h), (0, 255, 0), 2)
                         cv2.rectangle(video, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
@@ -201,6 +200,7 @@ class Monitorizar:
                             if self.reloj_desconocido == 0:
                                 self.reloj_desconocido = time.time()
                             self.personas_desconocidas += 1
+                            self.es_desconocido = True
                             cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                             cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
                             # Se captura la imagen de la persona desconocida
@@ -212,7 +212,7 @@ class Monitorizar:
 
 
                     # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
-                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))) and self.supervisado != '':
+                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))) and self.supervisado != '' and not self.es_desconocido:
                         if self.reloj_expresiones == 0:
                             self.reloj_expresiones = time.time()
                         rostro_48 = cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC)

@@ -97,6 +97,16 @@ class vwTiposDistraccion(APIView):
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
+        
+    def put(self, request, format = None):
+        if request.method == 'PUT':
+            try:
+                vigilar = Monitorizar(tutor_id = 1)
+                hilo_vigilar = threading.Thread(target = vigilar.reconocer)
+                hilo_vigilar.start()
+                return Response({'monitoreo': 'monitoreandooooo'})
+            except Exception as e: 
+                return Response({'monitoreo': 'error'})
 
     def delete(self, request, format = None):
         if request.method == 'DELETE':
