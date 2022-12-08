@@ -227,19 +227,19 @@ class Historial(models.Model):
                 supervisado = Supervisados.objects.get(pk = request.GET['supervisado_id'])
                 historial = supervisado.historial_supervisado.all().values()
                 if (len(historial)):
-                    fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date()
-                    fecha = fecha + datetime.timedelta(days = 1)
+                    fecha_maxima = (datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date())
+                    fecha_minima = fecha_maxima - datetime.timedelta(days = 6)
                     historial_grafico = []
-                    historial_expresiones = historial.filter(fecha_hora__lte = fecha)
+                    historial = historial.filter(fecha_hora__range = [str(fecha_minima) + ' 00:00:00.000000', str(fecha_maxima) + ' 23:59:59.000000'])
                     grafico_expresiones = { 
                     'tipo_grafico': 'Expresiones',
-                    'enfadado': (historial_expresiones.filter(observacion = 'Enfadado').count()),
-                    'disgustado': (historial_expresiones.filter(observacion = 'Disgustado').count()),
-                    'temeroso': (historial_expresiones.filter(observacion = 'Temeroso').count()),
-                    'feliz': (historial_expresiones.filter(observacion = 'Feliz').count()),
-                    'neutral': (historial_expresiones.filter(observacion = 'Neutral').count()),
-                    'triste': (historial_expresiones.filter(observacion = 'Triste').count()),
-                    'sorprendido': (historial_expresiones.filter(observacion = 'Sorprendido').count())
+                    'enfadado': (historial.filter(observacion = 'Enfadado').count()),
+                    'disgustado': (historial.filter(observacion = 'Disgustado').count()),
+                    'temeroso': (historial.filter(observacion = 'Temeroso').count()),
+                    'feliz': (historial.filter(observacion = 'Feliz').count()),
+                    'neutral': (historial.filter(observacion = 'Neutral').count()),
+                    'triste': (historial.filter(observacion = 'Triste').count()),
+                    'sorprendido': (historial.filter(observacion = 'Sorprendido').count())
                     }
                     grafico_sueno = { 
                         'tipo_grafico': 'Sueño'
@@ -247,12 +247,12 @@ class Historial(models.Model):
                     grafico_objetos = { 
                     'tipo_grafico': 'Objetos'
                     }
+                    fecha = fecha_maxima
                     for i in range(7):
-                        fecha = fecha - datetime.timedelta(days = (i + 1))
                         historial_diario = historial.filter(fecha_hora__range = [str(fecha) + ' 00:00:00.000000', str(fecha) + ' 23:59:59.000000'])
                         grafico_sueno[f'dia_{(i+1)}'] = historial_diario.filter(tipo_distraccion_id = 3).count()
                         grafico_objetos[f'dia_{(i+1)}'] = historial_diario.filter(tipo_distraccion_id = 4).count()
-                            
+                        fecha = fecha_maxima - datetime.timedelta(days = (i + 1))
                     historial_grafico.append(grafico_expresiones)
                     historial_grafico.append(grafico_sueno)
                     historial_grafico.append(grafico_objetos)

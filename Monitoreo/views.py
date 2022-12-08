@@ -1,5 +1,5 @@
 from Monitoreo.entrenamiento_facial import EntrenamientoFacial
-from Monitoreo.reconocimiento import Monitorizar
+from Monitoreo.reconocimiento import Vigilancia
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import *
@@ -91,8 +91,8 @@ class vwTiposDistraccion(APIView):
                 monitoreo = Monitoreo()
                 respuesta = monitoreo.activar(json_data)
                 if respuesta == 'activado':
-                    vigilar = Monitorizar(tutor_id = json_data['tutor_id'])
-                    hilo_vigilar = threading.Thread(target = vigilar.reconocer)
+                    vigilancia = Vigilancia(tutor_id = json_data['tutor_id'])
+                    hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                     hilo_vigilar.start()
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
@@ -101,8 +101,8 @@ class vwTiposDistraccion(APIView):
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                vigilar = Monitorizar(tutor_id = 1)
-                hilo_vigilar = threading.Thread(target = vigilar.reconocer)
+                vigilancia = Vigilancia(tutor_id = 1)
+                hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                 hilo_vigilar.start()
                 return Response({'monitoreo': 'monitoreandooooo'})
             except Exception as e: 
