@@ -18,24 +18,26 @@ class Vigilancia:
         # Atributos generales 
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
-        self.lista_supervisados = []
         self.imagen_evidencia = None
         self.supervisado = ''
         self.tutor_id = tutor_id
-        self.byte = bytes()
+        self.incremen_ausente = 60
+        self.incremen_registro = 30
+        self.incremen_sueno_per = 30
         # --- Reloj para el registro de un historial
         # tiempo de registro de historial en segundos
-        self.tiempo_registro = 30
+        self.tiempo_registro = self.incremen_registro
         # tiempo de espera en ausencia de un supervisado en segundos
-        self.tiempo_espera_sup = 60
+        self.tiempo_espera_sup = self.incremen_ausente
         # tiempo de inicio que aparece una persona desconocida
         self.reloj_desconocido = 0
         # tiempo de inicio que un supervisado se ausenta
-        self.reloj_supervisado = -1
+        self.reloj_supervisado = 0
         # tiempo de inicio de una expresion facial
         self.reloj_expresiones = 0
         # tiempo de inicio que aparece un objeto
         self.reloj_objetos = 0
+
         # --- ID de los tipos de distraccion
         # 1. Reconocer persona
         self.dis_pers_id = 1
@@ -107,7 +109,7 @@ class Vigilancia:
         # Variables de reconocimiento de sueño
         self.parpadeando = False
         self.tiempo_dormido = 0
-        self.sueno_permitido = 30
+        self.sueno_permitido = self.incremen_sueno_per
         self.inicio_sueno = 0
         # Configuración del dibujo
         self.mp_dibujo = mp.solutions.drawing_utils
@@ -183,7 +185,7 @@ class Vigilancia:
                 self.tiempo_ausente = round(time.time() - self.reloj_supervisado, 0)
                 if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
                     self.imagen_evidencia = video_color
-                    self.tiempo_espera_sup += 60
+                    self.tiempo_espera_sup += self.incremen_ausente
                     minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
                     self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos y {1} segundos ausente del área de estudio'.format(minutos, segundos), self.dis_pers_id)
                 # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
@@ -211,9 +213,9 @@ class Vigilancia:
                             self.es_desconocido = True
                             cv2.putText(video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
                             cv2.rectangle(video, (x, y),(x + w, y + h),(0, 0, 255), 2)
-                            # Se captura la imagen de la persona desconocida
-                            self.imagen_evidencia = video_color[y:y + h, x:x + w]
                             if (round(time.time() - self.reloj_desconocido, 0) >= self.tiempo_registro):
+                                # Se captura la imagen de la persona desconocida
+                                self.imagen_evidencia = video_color[y:y + h, x:x + w]
                                 self.reloj_desconocido = 0
                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                     self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id)
@@ -299,12 +301,12 @@ class Vigilancia:
                                             # Abrió los ojos
                                             self.parpadeando = False
                                             self.inicio_sueno = 0
-                                            self.sueno_permitido = 30
+                                            self.sueno_permitido = self.incremen_sueno_per
                                         # Temporizador
                                         if self.inicio_sueno != 0:
                                             self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
                                             if self.tiempo_dormido >= self.sueno_permitido:
-                                                self.sueno_permitido += 30
+                                                self.sueno_permitido += self.incremen_sueno_per
                                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                                     minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
                                                     self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id)
@@ -345,7 +347,7 @@ class Vigilancia:
                                     self.objetos_recono = {supervisado_id: {nombre_objeto: 1}}
                                 
                                 
-                        #print(self.objetos_recono)
+                        print(self.objetos_recono)
                         if (round(time.time() - self.reloj_objetos, 0) >= 10.0):                        
                             
                             self.reloj_objetos = 0
@@ -361,15 +363,19 @@ class Vigilancia:
 
 
                 if self.reconocer_personas and self.supervisado != '':
+                    # Si no hay personas desconocidas se cancela el cronómetro
+                    if self.personas_desconocidas == 0:
+                        self.reloj_desconocido = 0
                     # Si todos los rostros son desconocidos, pero antes si hubo un supervisado, se inicia el cronómetro
-                    if self.reloj_supervisado == -1 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas):
+                    if self.reloj_supervisado == 0 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas):
+                        # Se fue el supervisado
                         self.reloj_supervisado = time.time()  
                     elif len(rostros) != self.personas_desconocidas and self.reloj_supervisado > 0:
                         # Llegó el supervisado
-                        self.reloj_supervisado = -1
-                        self.tiempo_espera_sup = 60
+                        self.reloj_supervisado = 0
+                        self.tiempo_espera_sup = self.incremen_ausente
                     # Mostrar mensaje de presencia / ausencia
-                    if self.reloj_supervisado == -1:
+                    if self.reloj_supervisado == 0:
                         cv2.putText(video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                     else:
                         cv2.putText(video, 'Ausente, conteo iniciado !', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
