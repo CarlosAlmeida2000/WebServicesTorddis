@@ -96,7 +96,7 @@ class vwTiposDistraccion(APIView):
                     hilo_vigilar.start()
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
-                return Response({'monitoreo': 'error'})
+                return Response({'monitoreo': 'error'+str(e)})
         
     def put(self, request, format = None):
         if request.method == 'PUT':

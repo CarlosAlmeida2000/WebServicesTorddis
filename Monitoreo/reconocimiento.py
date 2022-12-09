@@ -183,10 +183,10 @@ class Vigilancia:
                 self.tiempo_ausente = round(time.time() - self.reloj_supervisado, 0)
                 if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
                     self.imagen_evidencia = video_color
-                    self.reloj_supervisado = -1
-                    self.tiempo_espera_sup *= 2
+                    self.tiempo_espera_sup += 60
                     minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
-                    self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos {1} y segundos ausente del área de estudio '.format(minutos, segundos), self.dis_pers_id)
+                    self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos y {1} segundos ausente del área de estudio'.format(minutos, segundos), self.dis_pers_id)
+                # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
                 self.personas_desconocidas = 0
                 # Recorriendo cada rostro
                 for (x, y, w, h) in rostros:
@@ -247,7 +247,7 @@ class Vigilancia:
                         expresion = max(emociones, key = emociones.get)
                         cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                         # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
-                        if (round(time.time() - (self.reloj_expresiones + 2), 0) > (self.tiempo_registro)):
+                        if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
                             ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
                             # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
                             if(len(ultimo_historial)):
@@ -304,7 +304,7 @@ class Vigilancia:
                                         if self.inicio_sueno != 0:
                                             self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
                                             if self.tiempo_dormido >= self.sueno_permitido:
-                                                self.sueno_permitido *= 2
+                                                self.sueno_permitido += 30
                                                 if(len(self.obtener_rostros(self.imagen_evidencia))):
                                                     minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
                                                     self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id)
@@ -363,7 +363,7 @@ class Vigilancia:
                 if self.reconocer_personas and self.supervisado != '':
                     # Si todos los rostros son desconocidos, pero antes si hubo un supervisado, se inicia el cronómetro
                     if self.reloj_supervisado == -1 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas):
-                        self.reloj_supervisado = time.time()            
+                        self.reloj_supervisado = time.time()  
                     elif len(rostros) != self.personas_desconocidas and self.reloj_supervisado > 0:
                         # Llegó el supervisado
                         self.reloj_supervisado = -1
