@@ -64,17 +64,17 @@ class vwPermisosObjetos(APIView):
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
                 permiso = PermisosObjetos()
-                return Response({'camara': permiso.activar(json_data)})
+                return Response({'objetos': permiso.activar(json_data)})
             except Exception as e: 
-                return Response({'camara': 'error'})
+                return Response({'objetos': 'error'+str(e)})
 
     def delete(self, request, format = None):
         if request.method == 'DELETE':
             try:
                 permiso = PermisosObjetos()
-                return Response({'camara': permiso.desactivar(request)})
+                return Response({'objetos': permiso.desactivar(request)})
             except Exception as e: 
-                return Response({'camara': 'error'})
+                return Response({'objetos': 'error'})
 
 class vwTiposDistraccion(APIView):
     def get(self, request, format = None):
@@ -91,9 +91,10 @@ class vwTiposDistraccion(APIView):
                 monitoreo = Monitoreo()
                 respuesta = monitoreo.activar(json_data)
                 if respuesta == 'activado':
-                    vigilancia = Vigilancia(tutor_id = json_data['tutor_id'])
-                    hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
-                    hilo_vigilar.start()
+                   pass
+                    #vigilancia = Vigilancia(tutor_id = json_data['tutor_id'])
+                    #hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
+                    #hilo_vigilar.start()
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
                 return Response({'monitoreo': 'error'+str(e)})
@@ -114,7 +115,7 @@ class vwTiposDistraccion(APIView):
                 monitoreo = Monitoreo()
                 return Response({'monitoreo': monitoreo.desactivar(request)})
             except Exception as e: 
-                return Response({'monitoreo': 'error'})
+                return Response({'monitoreo': 'error'+str(e)})
 
 class vwHistorial(APIView):
     def get(self, request, format = None):

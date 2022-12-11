@@ -97,10 +97,13 @@ class PermisosObjetos(models.Model):
         punto_guardado = transaction.savepoint()
         try:
             if 'objeto_id' in json_data and 'tutor_id' in json_data:
-                self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.objeto = Objetos.objects.get(pk = json_data['objeto_id'])
-                self.save()
-                return 'guardado'
+                if len(PermisosObjetos.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(objeto_id = json_data['objeto_id']))) == 0:
+                    self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
+                    self.objeto = Objetos.objects.get(pk = json_data['objeto_id'])
+                    self.save()
+                    return 'activado'
+                else:
+                    return 'el objeto ya está activado'
             return 'error'
         except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
@@ -115,10 +118,10 @@ class PermisosObjetos(models.Model):
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            self = PermisosObjetos.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(objeto_id = request.GET['objeto_id']))
-            if(len(self)):
-                self[0].delete()
-                return 'eliminado'
+            permiso = PermisosObjetos.objects.get(Q(tutor_id = request.GET['tutor_id']) & Q(objeto_id = request.GET['objeto_id']))
+            permiso.delete()
+            return 'eliminado'
+        except PermisosObjetos.DoesNotExist:
             return 'el objeto no tiene un permiso'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
@@ -156,29 +159,32 @@ class Monitoreo(models.Model):
         punto_guardado = transaction.savepoint()
         try:
             if 'tutor_id' in json_data and 'tipo_dist_id' in json_data:
-                self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
-                self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_dist_id'])
-                self.save()
-                return 'activado'
+                if len(Monitoreo.objects.filter(Q(tutor_id = json_data['tutor_id']) & Q(tipo_distraccion_id = json_data['tipo_dist_id']))) == 0:
+                    self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
+                    self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_dist_id'])
+                    self.save()
+                    return 'activado'
+                else:
+                    return 'el tipo de distracción ya está activado'
             return 'error'
         except Tutores.DoesNotExist or TiposDistraccion.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error'+str(e)
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error'+str(e)
     
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()
         try:
-            self = Monitoreo.objects.filter(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['tipo_dist_id']))
-            if(len(self)):
-                self[0].delete()
-                return 'desactivado'
+            monitoreo = Monitoreo.objects.get(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['tipo_dist_id']))
+            monitoreo.delete()
+            return 'desactivado'
+        except Monitoreo.DoesNotExist:
             return 'el tipo de distracción no está activado'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error'+str(e)
 
 class Historial(models.Model):
     fecha_hora = models.DateTimeField()

@@ -331,7 +331,15 @@ class Vigilancia:
 
                         for i in range(len(prediction[0])):
                             # Solo los objetos que tengan una precisión superior del 40 %
-                            if (prediction[0][i] >= 0.40):
+                            if (prediction[0][i] >= 0.50):
+                                tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
+                                if len(tiene_permiso):
+                                     cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                else:
+                                #     self.imagen_evidencia = video_color
+                                #     #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
+                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
                                 supervisado_id = self.supervisado.split('_')[0]
                                 # Mejorar la precisión del reconocimiento de los objetos, después de estar analizando durante 10 segundos se escoge el objeto con mayor manifestación
                                 contador_objeto = 1
