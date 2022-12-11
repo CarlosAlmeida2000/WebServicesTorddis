@@ -314,7 +314,7 @@ class Vigilancia:
 
 
                     # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
-                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_obj_id))):
+                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_obj_id))) and self.supervisado != '':
                         if self.reloj_objetos == 0:
                             self.reloj_objetos = time.time()
                         frame = cv2.flip(video, 1)
@@ -327,20 +327,10 @@ class Vigilancia:
                         # realizar reconocimiento de objetos
                         prediction = self.modelo_objetos.predict(self.data_entrena_objet)
 
-
-
+                        supervisado_id = self.supervisado.split('_')[0]
                         for i in range(len(prediction[0])):
                             # Solo los objetos que tengan una precisión superior del 40 %
-                            if (prediction[0][i] >= 0.50):
-                                tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
-                                if len(tiene_permiso):
-                                     cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                                else:
-                                #     self.imagen_evidencia = video_color
-                                #     #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
-                                    cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-
-                                supervisado_id = self.supervisado.split('_')[0]
+                            if (prediction[0][i] >= 0.55):
                                 # Mejorar la precisión del reconocimiento de los objetos, después de estar analizando durante 10 segundos se escoge el objeto con mayor manifestación
                                 contador_objeto = 1
                                 nombre_objeto = self.labels_objetos[i]
@@ -354,21 +344,24 @@ class Vigilancia:
                                 else:
                                     self.objetos_recono = {supervisado_id: {nombre_objeto: 1}}
                                 
-                                
                         print(self.objetos_recono)
                         if (round(time.time() - self.reloj_objetos, 0) >= 10.0):                        
-                            
+                            i = 1
+                            for objeto in self.objetos_recono.get(supervisado_id, None):
+                                if self.objetos_recono.get(supervisado_id).get(objeto) > 7:
+                                    tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre = objeto))
+                                    if len(tiene_permiso):
+                                        print(str(objeto) + ' - CON PERMISO')
+                                        cv2.putText(video, str(objeto) + ' - CON PERMISO', (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                    else:
+                                        print(str(objeto) + ' - SIN PERMISO')
+                                        #self.imagen_evidencia = video_color
+                                        #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
+                                        cv2.putText(video, str(objeto) + ' - SIN PERMISO', (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                    i += 2
                             self.reloj_objetos = 0
                             self.objetos_recono = {}
                             
-                            # tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto_id = (i + 1)))
-                            # if len(tiene_permiso):
-                            #     cv2.putText(video, str(self.labels_objetos[i]) + ' - CON PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                            # else:
-                            #     self.imagen_evidencia = video_color
-                            #     #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
-                            #     cv2.putText(video, str(self.labels_objetos[i]) + ' - SIN PERMISO - prob: ' + str(prediction[0][i]), (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-
 
                 if self.reconocer_personas and self.supervisado != '':
                     # Si no hay personas desconocidas se cancela el cronómetro

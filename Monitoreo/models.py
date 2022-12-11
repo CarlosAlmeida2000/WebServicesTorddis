@@ -105,12 +105,9 @@ class PermisosObjetos(models.Model):
                 else:
                     return 'el objeto ya está activado'
             return 'error'
-        except Tutores.DoesNotExist:
+        except Tutores.DoesNotExist or Objetos.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'No existe el tutor'
-        except Objetos.DoesNotExist:
-            transaction.savepoint_rollback(punto_guardado)
-            return 'No existe el objeto'
+            return 'error'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -169,7 +166,7 @@ class Monitoreo(models.Model):
             return 'error'
         except Tutores.DoesNotExist or TiposDistraccion.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'+str(e)
