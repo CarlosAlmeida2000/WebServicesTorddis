@@ -248,6 +248,7 @@ class Vigilancia:
                             self.expresiones_recono = {supervisado_id: {expresion: 1}}
                         emociones = self.expresiones_recono.get(supervisado_id, -1)
                         expresion = max(emociones, key = emociones.get)
+                        #print(self.expresiones_recono)
                         cv2.putText(video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                         # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
                         if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
@@ -334,7 +335,7 @@ class Vigilancia:
                         supervisado_id = self.supervisado.split('_')[0]
                         for i in range(len(prediction[0])):
                             # Solo los objetos que tengan una precisión superior del 40 %
-                            if (prediction[0][i] >= 0.50):
+                            if (prediction[0][i] >= 0.60):
                                 # Mejorar la precisión del reconocimiento de los objetos
                                 contador_objeto = 1
                                 nombre_objeto = self.labels_objetos[i]
@@ -345,11 +346,15 @@ class Vigilancia:
                                         contador_objeto = self.objetos_recono.get(supervisado_id, -1).get(nombre_objeto, -1)
                                         contador_objeto += 1
                                         self.objetos_recono[supervisado_id][nombre_objeto] = contador_objeto
+                                        self.imagen_objetos[supervisado_id][nombre_objeto] = video_color
                                     else:
+                                        self.imagen_objetos.get(supervisado_id, -1).update({nombre_objeto: video_color})
                                         self.objetos_recono.get(supervisado_id, -1).update({nombre_objeto: 1})
                                 else:
+                                    self.imagen_objetos = {supervisado_id: {nombre_objeto: video_color}}
                                     self.objetos_recono = {supervisado_id: {nombre_objeto: 1}}
                         # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
+                        print(self.objetos_recono)
                         if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
                             lista_objetos = self.objetos_recono.get(supervisado_id, None)
                             if len(lista_objetos) > 0:
@@ -361,10 +366,12 @@ class Vigilancia:
                                             print(str(objeto) + ' - CON PERMISO')
                                         else:
                                             print(str(objeto) + ' - SIN PERMISO')
-                                            # se escoge la imagen del objeto desde la lista general de imagenes en array
-                                            #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id)
+                                            # se escoge la imagen del objeto desde el diccionario general de imagenes en array
+                                            self.imagen_evidencia = self.imagen_objetos.get(supervisado_id, -1).get(objeto, -1)
+                                            self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id)
                                 self.reloj_objetos = 0
                                 self.objetos_recono = {}
+                                self.imagen_objetos = {}
                             
 
                 # Reiniciando variables 
