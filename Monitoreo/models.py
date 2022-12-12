@@ -169,7 +169,7 @@ class Monitoreo(models.Model):
             return 'error'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
     
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()
@@ -181,7 +181,7 @@ class Monitoreo(models.Model):
             return 'el tipo de distracción no está activado'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'+str(e)
+            return 'error'
 
 class Historial(models.Model):
     fecha_hora = models.DateTimeField()
@@ -195,7 +195,15 @@ class Historial(models.Model):
         try:
             if 'supervisado_id' in request.GET and 'fecha' in request.GET:
                 fecha = datetime.datetime.strptime(request.GET['fecha'], "%Y-%m-%d").date() + datetime.timedelta(days = 1)
-                historial = Historial.objects.filter(Q(supervisado_id = request.GET['supervisado_id']) & Q(fecha_hora__lte = fecha)).values('id', 'fecha_hora', 'imagen_evidencia', 'observacion', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos')
+                historial = Historial.objects.filter(Q(supervisado_id = request.GET['supervisado_id']) & Q(fecha_hora__lte = fecha)).values('id', 'fecha_hora', 'imagen_evidencia',
+                'observacion', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 'supervisado__persona__apellidos')
+                return historial
+            elif 'tutor_id' in request.GET and 'fecha_actual' in request.GET:
+                supervisados = Supervisados.objects.filter(tutor_id = request.GET['tutor_id'])
+                hoy = datetime.datetime.today().date()
+                historial = Historial.objects.filter(fecha_hora__range = [str(hoy) + ' 00:00:00.000000', str(hoy) + ' 23:59:59.000000']).exclude(~Q(supervisado_id__in = supervisados.values('id'))
+                ).values('id', 'fecha_hora', 'imagen_evidencia', 'observacion', 'tipo_distraccion_id', 'tipo_distraccion__nombre' , 'supervisado_id', 'supervisado__persona__nombres', 
+                'supervisado__persona__apellidos')
                 return historial
             elif 'historial_id' in request.GET:
                 historial = Historial.objects.get(pk = request.GET['historial_id'])

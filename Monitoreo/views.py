@@ -66,7 +66,7 @@ class vwPermisosObjetos(APIView):
                 permiso = PermisosObjetos()
                 return Response({'objetos': permiso.activar(json_data)})
             except Exception as e: 
-                return Response({'objetos': 'error'+str(e)})
+                return Response({'objetos': 'error'})
 
     def delete(self, request, format = None):
         if request.method == 'DELETE':
@@ -96,7 +96,7 @@ class vwTiposDistraccion(APIView):
                     hilo_vigilar.start()
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
-                return Response({'monitoreo': 'error'+str(e)})
+                return Response({'monitoreo': 'error'})
         
     def put(self, request, format = None):
         if request.method == 'PUT':
@@ -104,7 +104,7 @@ class vwTiposDistraccion(APIView):
                 vigilancia = Vigilancia(tutor_id = 1)
                 hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                 hilo_vigilar.start()
-                return Response({'monitoreo': 'monitoreandooooo'})
+                return Response({'monitoreo': 'monitoreando.....'})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 
@@ -114,7 +114,7 @@ class vwTiposDistraccion(APIView):
                 monitoreo = Monitoreo()
                 return Response({'monitoreo': monitoreo.desactivar(request)})
             except Exception as e: 
-                return Response({'monitoreo': 'error'+str(e)})
+                return Response({'monitoreo': 'error'})
 
 class vwHistorial(APIView):
     def get(self, request, format = None):

@@ -126,9 +126,10 @@ class Vigilancia:
         # Crear el array de la forma adecuada para alimentar el modelo keras con las imágenes de 224 x 244 pixeles
         self.data_entrena_objet = np.ndarray(shape = (1, 224, 224, 3), dtype = np.float32)
         self.objetos_recono = {}
+        self.imagen_objetos = {}
         # Cargar las clases de objetos
         self.labels_objetos = list()
-        for i in open(self.ruta_modelos + 'labels.txt', 'r'): 
+        for i in open(self.ruta_modelos + 'labels.txt', 'r', encoding='utf8'): 
             self.labels_objetos.append(i.split()[1])
 
 
@@ -231,7 +232,7 @@ class Vigilancia:
                         prediction = self.modelo_expresiones.predict(cropped_img)
                         expresion = self.expresion_facial[int(np.argmax(prediction))]
                         supervisado_id = self.supervisado.split('_')[0]
-                        # Mejorar la precisión del reconocimiento de expresiones, después de estar analizando durante 10 segundos se escoge la expresión con mayor manifestación
+                        # Mejorar la precisión del reconocimiento de expresiones, después de estar analizando durante 30 segundos se registra la expresión con mayor manifestación
                         if (round(time.time() - self.reloj_expresiones, 0) == 10 or round(time.time() - self.reloj_expresiones, 0) == 20): 
                             self.reloj_expresiones -= 1                    
                             self.expresiones_recono = {}
@@ -326,14 +327,19 @@ class Vigilancia:
                         self.data_entrena_objet[0] = (image_array.astype(np.float32) / 127.0) - 1
                         # realizar reconocimiento de objetos
                         prediction = self.modelo_objetos.predict(self.data_entrena_objet)
-
+                        # Cada 10 segundos hasta cumplir el tiempo de registro se limpia el diccionario de objetos reconocidos
+                        if (round(time.time() - self.reloj_objetos, 0) == 10 or round(time.time() - self.reloj_objetos, 0) == 20): 
+                            self.reloj_objetos -= 1                    
+                            self.objetos_recono = {}
                         supervisado_id = self.supervisado.split('_')[0]
                         for i in range(len(prediction[0])):
                             # Solo los objetos que tengan una precisión superior del 40 %
-                            if (prediction[0][i] >= 0.55):
-                                # Mejorar la precisión del reconocimiento de los objetos, después de estar analizando durante 10 segundos se escoge el objeto con mayor manifestación
+                            if (prediction[0][i] >= 0.50):
+                                # Mejorar la precisión del reconocimiento de los objetos
                                 contador_objeto = 1
                                 nombre_objeto = self.labels_objetos[i]
+                                # ALMECENAR EN UNA LISTA EL ARRAY DE FOTOS DE CADA OBJETO SIN PERMISO PARA QUE DESPUES GUARDARLA
+                                #self.imagen_evidencia = video_color
                                 if self.objetos_recono.get(supervisado_id, -1) != -1:
                                     if self.objetos_recono.get(supervisado_id, -1).get(nombre_objeto, -1) != -1:
                                         contador_objeto = self.objetos_recono.get(supervisado_id, -1).get(nombre_objeto, -1)
@@ -343,26 +349,25 @@ class Vigilancia:
                                         self.objetos_recono.get(supervisado_id, -1).update({nombre_objeto: 1})
                                 else:
                                     self.objetos_recono = {supervisado_id: {nombre_objeto: 1}}
-                                
-                        print(self.objetos_recono)
-                        if (round(time.time() - self.reloj_objetos, 0) >= 10.0):                        
-                            i = 1
-                            for objeto in self.objetos_recono.get(supervisado_id, None):
-                                if self.objetos_recono.get(supervisado_id).get(objeto) > 7:
-                                    tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre = objeto))
-                                    if len(tiene_permiso):
-                                        print(str(objeto) + ' - CON PERMISO')
-                                        cv2.putText(video, str(objeto) + ' - CON PERMISO', (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                                    else:
-                                        print(str(objeto) + ' - SIN PERMISO')
-                                        #self.imagen_evidencia = video_color
-                                        #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(self.labels_objetos[i]), self.dis_obj_id)
-                                        cv2.putText(video, str(objeto) + ' - SIN PERMISO', (20, 70 + (i * 20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                                    i += 2
-                            self.reloj_objetos = 0
-                            self.objetos_recono = {}
+                        # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
+                        if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
+                            lista_objetos = self.objetos_recono.get(supervisado_id, None)
+                            if len(lista_objetos) > 0:
+                                for objeto in lista_objetos:
+                                    # Si tiene la probabilidad de más de 5 apariciones el objeto, se procede a verificar el permiso de uso
+                                    if self.objetos_recono.get(supervisado_id).get(objeto) > 5:
+                                        tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre__startswith = objeto))
+                                        if len(tiene_permiso):
+                                            print(str(objeto) + ' - CON PERMISO')
+                                        else:
+                                            print(str(objeto) + ' - SIN PERMISO')
+                                            # se escoge la imagen del objeto desde la lista general de imagenes en array
+                                            #self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id)
+                                self.reloj_objetos = 0
+                                self.objetos_recono = {}
                             
 
+                # Reiniciando variables 
                 if self.reconocer_personas and self.supervisado != '':
                     # Si no hay personas desconocidas se cancela el cronómetro
                     if self.personas_desconocidas == 0:
