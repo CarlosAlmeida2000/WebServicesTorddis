@@ -1,13 +1,44 @@
-from Monitoreo.entrenamiento_facial import EntrenamientoFacial
+from Monitoreo.entrenamiento_facial import EntrenamiFacial
 from Monitoreo.reconocimiento import Vigilancia
+from django.http import StreamingHttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import *
-import json
+import json, cv2
 
 # Create your views here.
-class vwCamara(APIView):
+vigilancia = Vigilancia()
+entrenar_rostros = EntrenamiFacial()
 
+class vWvideo(APIView):
+    def get(self, request, format = None):
+        if request.method == 'GET':
+            try:
+                if 'tipo' in request.GET:
+                    if request.GET['tipo'] == 'monitoreo':
+                        return StreamingHttpResponse(vWvideo.trans_monitoreo(), content_type="multipart/x-mixed-replace;boundary=frame")
+                    elif request.GET['tipo'] == 'entrenamiento':
+                        return StreamingHttpResponse(vWvideo.trans_entrena(), content_type="multipart/x-mixed-replace;boundary=frame")
+            except Exception as e:
+                return Response({'video': 'error'})
+    
+    @staticmethod
+    def trans_monitoreo():
+        while not vigilancia.fin_vigilancia:
+            _, jpeg = cv2.imencode('.jpg', vigilancia.video)
+            imagen = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + imagen + b'\r\n\r\n')
+    
+    @staticmethod
+    def trans_entrena():
+        while not entrenar_rostros.fin_entrenamiento:
+            _, jpeg = cv2.imencode('.jpg', entrenar_rostros.video)
+            imagen = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + imagen + b'\r\n\r\n')
+
+class vwCamara(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
@@ -34,7 +65,6 @@ class vwCamara(APIView):
                 return Response({'camara': 'error'})
 
 class vwEntrenamientoFacial(APIView):
-
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
@@ -46,10 +76,11 @@ class vwEntrenamientoFacial(APIView):
         if request.method == 'PUT':
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
-                entrenar_rostros = EntrenamientoFacial(json_data['supervisado_id'])
+                entrenar_rostros.inicializar()
+                entrenar_rostros.supervisado_id = json_data['supervisado_id']
                 return Response({'entrenamiento_facial': entrenar_rostros.entrenar()})
             except Exception as e: 
-                return Response({'entrenamiento_facial': 'error'})
+                return Response({'entrenamiento_facial': 'error'+str(e)})
 
 class vwPermisosObjetos(APIView):
     def get(self, request, format = None):
@@ -91,17 +122,19 @@ class vwTiposDistraccion(APIView):
                 monitoreo = Monitoreo()
                 respuesta = monitoreo.activar(json_data)
                 if respuesta != 'error':
-                    vigilancia = Vigilancia(tutor_id = json_data['tutor_id'])
+                    vigilancia.inicializar()
+                    vigilancia.tutor_id = json_data['tutor_id']
                     hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                     hilo_vigilar.start()
                 return Response({'monitoreo': respuesta})
             except Exception as e: 
-                return Response({'monitoreo': 'error'})
+                return Response({'monitoreo': 'error'+str(e)})
         
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                vigilancia = Vigilancia(tutor_id = 1)
+                vigilancia.inicializar()
+                vigilancia.tutor_id = 1
                 hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                 hilo_vigilar.start()
                 return Response({'monitoreo': 'monitoreando.....'})
