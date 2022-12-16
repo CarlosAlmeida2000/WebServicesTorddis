@@ -10,7 +10,6 @@ from datetime import datetime
 import cv2, math, os, time
 import mediapipe as mp
 import numpy as np
-import time
 
 class Vigilancia:
     
@@ -156,7 +155,6 @@ class Vigilancia:
                 self.historial.imagen_evidencia.save('dis_' + str(tipo_distraccion_id) + '_id_' + str(self.historial.supervisado.persona.id) + '_' + str(self.historial.fecha_hora) + '.png', file, save = True)
                 self.historial.save()
         except Exception as e:
-            print(str(e))
             pass
     
     def convertir_min_seg(self, segundos):
@@ -169,6 +167,14 @@ class Vigilancia:
     def obtener_rostros(self, imagen):
         return self.clasificador_haar.detectMultiScale(cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY), scaleFactor = 1.3, minNeighbors = 5)
 
+    def distraccion_nino(self, distraido):
+        try:
+            unSupervisado = Supervisados.objects.get(pk = self.supervisado.split('_')[0])
+            unSupervisado.distraido = distraido
+            unSupervisado.save()
+        except Exception as e:
+            pass
+    
     def iniciar(self):
         try:
             cap = cv2.VideoCapture(0)
@@ -194,6 +200,7 @@ class Vigilancia:
                 if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
                     self.tiempo_espera_sup += self.incremen_ausente
                     minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
+                    self.distraccion_nino(True)
                     self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
                 # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
                 self.personas_desconocidas = 0
@@ -316,6 +323,7 @@ class Vigilancia:
                                             self.parpadeando = False
                                             self.inicio_sueno = 0
                                             self.sueno_permitido = self.incremen_sueno_per
+                                            self.distraccion_nino(False)
                                         # Temporizador
                                         if self.inicio_sueno != 0:
                                             self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
@@ -323,6 +331,7 @@ class Vigilancia:
                                                 self.sueno_permitido += self.incremen_sueno_per
                                                 if(len(self.obtener_rostros(self.imagen_dormido))):
                                                     minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
+                                                    self.distraccion_nino(True)
                                                     self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
                                                 
 
@@ -396,6 +405,7 @@ class Vigilancia:
                         # Llegó el supervisado
                         self.reloj_supervisado = 0
                         self.tiempo_espera_sup = self.incremen_ausente
+                        self.distraccion_nino(False)
                     # Mostrar mensaje de presencia / ausencia
                     if self.reloj_supervisado == 0:
                         cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
@@ -412,5 +422,4 @@ class Vigilancia:
             cv2.destroyAllWindows()
             self.fin_vigilancia = True
         except Exception as e: 
-            print(str(e))
             self.fin_vigilancia = True

@@ -9,4 +9,5 @@ urlpatterns = [
     path('tipos-distraccion/', views.vwTiposDistraccion.as_view()),
     path('historial/', views.vwHistorial.as_view()),
     path('graficos/', views.vwGrafico.as_view()),
+    path('distraccion/', views.vwDistraccion.as_view()),
 ]

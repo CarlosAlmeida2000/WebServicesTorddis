@@ -4,7 +4,7 @@ from django.db import IntegrityError
 from django.db import transaction
 from Persona.image import Image
 from django.db import models
-import threading, datetime
+import datetime
 
 # Create your models here.
 class TiposDistraccion(models.Model):
@@ -105,9 +105,12 @@ class PermisosObjetos(models.Model):
                 else:
                     return 'el objeto ya está activado'
             return 'error'
-        except Tutores.DoesNotExist or Objetos.DoesNotExist:
+        except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'no existe el tutor'
+        except Objetos.DoesNotExist:
+            transaction.savepoint_rollback(punto_guardado)
+            return 'no existe el objeto'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -164,9 +167,12 @@ class Monitoreo(models.Model):
                 else:
                     return 'el tipo de distracción ya está activado'
             return 'error'
-        except Tutores.DoesNotExist or TiposDistraccion.DoesNotExist:
+        except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'no existe el tutor'
+        except TiposDistraccion.DoesNotExist:
+            transaction.savepoint_rollback(punto_guardado)
+            return 'no existe el tipo de distracción'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -182,6 +188,20 @@ class Monitoreo(models.Model):
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
+    
+    @staticmethod
+    def existe_distraccion(request):
+        try:
+            if 'direccion_ruta' in request.GET:
+                if Supervisados.objects.filter(Q(tutor_id = Camaras.objects.get(direccion_ruta = request.GET['direccion_ruta']).tutor_id) & Q(distraido = True)).count() > 0:
+                    return True
+                return False
+            return 'error'
+        except Camaras.DoesNotExist:
+            return 'no existe la camara'
+        except Exception as e: 
+            return 'error'
+
 
 class Historial(models.Model):
     fecha_hora = models.DateTimeField()
@@ -256,7 +276,7 @@ class Historial(models.Model):
                         'tipo_grafico': 'Sueño'
                     }
                     grafico_objetos = { 
-                    'tipo_grafico': 'Objetos'
+                        'tipo_grafico': 'Objetos'
                     }
                     fecha = fecha_maxima
                     for i in range(7):
@@ -273,6 +293,6 @@ class Historial(models.Model):
             else:
                 return []
         except Supervisados.DoesNotExist:    
-            return {'grafico': 'No existe el supervisado'}
+            return {'grafico': 'no existe el supervisado'}
         except Exception as e: 
             return {'grafico': 'error'}

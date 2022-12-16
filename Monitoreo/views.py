@@ -3,8 +3,8 @@ from Monitoreo.reconocimiento import Vigilancia
 from django.http import StreamingHttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import json, cv2, threading
 from .models import *
-import json, cv2
 
 # Create your views here.
 vigilancia = Vigilancia()
@@ -164,3 +164,11 @@ class vwGrafico(APIView):
                 return Response(Historial.graficos(request))
             except Exception as e:
                 return Response({'grafico': 'error'})
+
+class vwDistraccion(APIView):
+    def get(self, request, format = None):
+        if request.method == 'GET':
+            try:
+                return Response({'distraccion': Monitoreo.existe_distraccion(request)})
+            except Exception as e:
+                return Response({'distraccion': 'error'})

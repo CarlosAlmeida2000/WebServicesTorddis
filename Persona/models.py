@@ -132,6 +132,7 @@ class Tutores(models.Model):
             return {'tutores': 'error'}
 
 class Supervisados(models.Model):
+    distraido = models.BooleanField(default = False)
     tutor = models.ForeignKey('Persona.Tutores', on_delete = models.PROTECT)
     persona = models.ForeignKey('Persona.Personas', on_delete = models.PROTECT)
 
