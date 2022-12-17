@@ -81,24 +81,25 @@ class Tutores(models.Model):
     def guardar(self, json_data):
         punto_guardado = transaction.savepoint()
         try:
-            if(self.pk == None):
-                # Es una nueva persona
-                self.persona = Personas()
-            persona_guardada, self.persona = self.persona.guardar(json_data)
-            if(persona_guardada == 'si'):
-                if 'usuario' in json_data:
-                    self.usuario = json_data['usuario']
-                if 'clave' in json_data:
-                    self.clave = json_data['clave']
-                if 'correo' in json_data:
-                    self.correo = json_data['correo']
-                self.save()
-                return 'guardado'
-            else:
-                return persona_guardada
-        except IntegrityError:
-            transaction.savepoint_rollback(punto_guardado)
-            return 'usuario repetido'
+            if 'usuario' in json_data:
+                existe_usuario = len(Tutores.objects.filter(usuario = json_data['usuario']))
+                if existe_usuario == 0 or (existe_usuario == 1 and self.pk != None):
+                    if(self.pk == None):
+                        # Es una nueva persona
+                        self.persona = Personas()
+                    persona_guardada, self.persona = self.persona.guardar(json_data)
+                    if(persona_guardada == 'si'):
+                        self.usuario = json_data['usuario']
+                        if 'clave' in json_data:
+                            self.clave = json_data['clave']
+                        if 'correo' in json_data:
+                            self.correo = json_data['correo']
+                        self.save()
+                        return 'guardado'
+                    else:
+                        return persona_guardada
+                else:
+                    return 'usuario repetido'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
