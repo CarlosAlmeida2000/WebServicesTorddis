@@ -25,18 +25,18 @@ class vWvideo(APIView):
     @staticmethod
     def trans_monitoreo():
         while not vigilancia.fin_vigilancia:
-            _, jpeg = cv2.imencode('.jpg', vigilancia.video)
-            imagen = jpeg.tobytes()
+            _, png = cv2.imencode('.png', vigilancia.video)
+            imagen = png.tobytes()
             yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + imagen + b'\r\n\r\n')
+                b'Content-Type: image/png\r\n\r\n' + imagen + b'\r\n\r\n')
     
     @staticmethod
     def trans_entrena():
         while not entrenar_rostros.fin_entrenamiento:
-            _, jpeg = cv2.imencode('.jpg', entrenar_rostros.video)
-            imagen = jpeg.tobytes()
+            _, png = cv2.imencode('.png', entrenar_rostros.video)
+            imagen = png.tobytes()
             yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + imagen + b'\r\n\r\n')
+                b'Content-Type: image/png\r\n\r\n' + imagen + b'\r\n\r\n')
 
 class vwCamara(APIView):
     def get(self, request, format = None):
@@ -78,9 +78,10 @@ class vwEntrenamientoFacial(APIView):
                 json_data = json.loads(request.body.decode('utf-8'))
                 entrenar_rostros.inicializar()
                 entrenar_rostros.supervisado_id = json_data['supervisado_id']
+                entrenar_rostros.tutor_id = json_data['tutor_id']
                 return Response({'entrenamiento_facial': entrenar_rostros.entrenar()})
             except Exception as e: 
-                return Response({'entrenamiento_facial': 'error'+str(e)})
+                return Response({'entrenamiento_facial': 'error'})
 
 class vwPermisosObjetos(APIView):
     def get(self, request, format = None):
@@ -120,24 +121,26 @@ class vwTiposDistraccion(APIView):
             try:
                 json_data = json.loads(request.body.decode('utf-8'))
                 monitoreo = Monitoreo()
-                respuesta = monitoreo.activar(json_data)
-                if respuesta != 'error':
+                fallo, mensaje = monitoreo.activar(json_data)
+                if fallo != 'error':
                     vigilancia.inicializar()
                     vigilancia.tutor_id = json_data['tutor_id']
                     hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                     hilo_vigilar.start()
-                return Response({'monitoreo': respuesta})
+                return Response({'monitoreo': mensaje})
             except Exception as e: 
-                return Response({'monitoreo': 'error'+str(e)})
+                return Response({'monitoreo': 'error'})
         
     def put(self, request, format = None):
         if request.method == 'PUT':
             try:
-                vigilancia.inicializar()
-                vigilancia.tutor_id = 1
-                hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
-                hilo_vigilar.start()
-                return Response({'monitoreo': 'monitoreando.....'})
+                if 'tutor_id' in request.GET:
+                    vigilancia.inicializar()
+                    vigilancia.tutor_id = request.GET['tutor_id']
+                    hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
+                    hilo_vigilar.start()
+                    return Response({'monitoreo': 'monitoreando.....'})
+                return Response({'monitoreo': 'error'})
             except Exception as e: 
                 return Response({'monitoreo': 'error'})
 

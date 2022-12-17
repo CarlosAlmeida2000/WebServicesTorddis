@@ -163,19 +163,19 @@ class Monitoreo(models.Model):
                     self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
                     self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_dist_id'])
                     self.save()
-                    return 'activado'
+                    return '', 'activado'
                 else:
-                    return 'el tipo de distracción ya está activado'
-            return 'error'
+                    return 'error', 'el tipo de distracción ya está activado'
+            return 'error', 'error'
         except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'no existe el tutor'
+            return 'error', 'no existe el tutor'
         except TiposDistraccion.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
-            return 'no existe el tipo de distracción'
+            return 'error', 'no existe el tipo de distracción'
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
-            return 'error'
+            return 'error', 'error'
     
     def desactivar(self, request):
         punto_guardado = transaction.savepoint()

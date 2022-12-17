@@ -179,8 +179,8 @@ class Vigilancia:
         try:
             cap = cv2.VideoCapture(0)
             # CUANDO SE PRUEBE CON EL DISPOSITIVO, AJUSTAR ABAJO LAS LONGITUDES CUANDO SE CIERRA Y ABRE UN OJO, 14 ES CUANDO SE USA LA RESOLUCION DE 1280 X 720
-            cap.set(3, 1280) # ancho ventana
-            cap.set(6, 720) # alto ventana
+            cap.set(3, 1280) # ancho video
+            cap.set(6, 720) # alto video
             
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
                 ret, self.video = cap.read()
@@ -410,7 +410,7 @@ class Vigilancia:
                     if self.reloj_supervisado == 0:
                         cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                     else:
-                        cv2.putText(self.video, 'Ausente, conteo iniciado !', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        cv2.putText(self.video, 'Ausente, conteo iniciado!', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                     
                 # Detener el proceso de monitoreo                
                 if cv2.waitKey(1) & 0xFF == ord('q'):

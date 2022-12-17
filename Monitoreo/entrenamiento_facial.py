@@ -13,6 +13,7 @@ class EntrenamiFacial:
     def inicializar(self):
         self.supervisado = None
         self.supervisado_id = 0
+        self.tutor_id = 0
         self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
         self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
         self.etiquetas = []
@@ -29,6 +30,8 @@ class EntrenamiFacial:
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres, exist_ok = True)
             # se crean las 200 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
             cap = cv2.VideoCapture(0)
+            cap.set(3, 1280) # ancho video
+            cap.set(6, 720) # alto video
             while True:
                 ret, self.video = cap.read()
                 if not ret:
@@ -38,13 +41,14 @@ class EntrenamiFacial:
                 gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                 auxFrame = self.video.copy()
                 rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
+                cv2.putText(self.video, 'Capturando {0} fotos de 400'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                 for (x, y, w, h) in rostros:
                     cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
                     rostro = auxFrame[y:y + h, x:x + w]
                     rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
                     cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '_' + self.supervisado.persona.nombres + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
                     self.cont_imagenes += 1
-                cv2.imshow('Video', cv2.resize(self.video,(1500, 760), interpolation = cv2.INTER_CUBIC))
+                cv2.imshow('Video', self.video)
                 k =  cv2.waitKey(1)
                 if k == 27 or self.cont_imagenes >= self.imagenes_capturar:
                     cv2.destroyAllWindows()
