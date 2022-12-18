@@ -10,4 +10,6 @@ urlpatterns = [
     path('historial/', views.vwHistorial.as_view()),
     path('graficos/', views.vwGrafico.as_view()),
     path('distraccion/', views.vwDistraccion.as_view()),
+    path('stream-entrenamiento/',views.streamEntrenamiento),
+    path('stream-monitoreo/',views.streamMonitoreo),
 ]

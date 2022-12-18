@@ -1,6 +1,7 @@
 from Monitoreo.entrenamiento_facial import EntrenamiFacial
 from Monitoreo.reconocimiento import Vigilancia
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse,HttpResponseServerError
+from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import json, cv2, threading
@@ -37,6 +38,15 @@ class vWvideo(APIView):
             imagen = png.tobytes()
             yield (b'--frame\r\n'
                 b'Content-Type: image/png\r\n\r\n' + imagen + b'\r\n\r\n')
+
+#Mostrar template                
+def streamEntrenamiento(request): 
+        template = "streamEntrenamiento.html"
+        return render(request,template)
+
+def streamMonitoreo(request): 
+        template = "streamMonitoreo.html"
+        return render(request,template)
 
 class vwCamara(APIView):
     def get(self, request, format = None):
