@@ -147,7 +147,7 @@ class Vigilancia:
                 self.historial = Historial()
                 self.historial.fecha_hora = datetime.now()
                 self.historial.observacion = observacion
-                self.historial.supervisado = Supervisados.objects.get(pk = self.supervisado.split('_')[0])
+                self.historial.supervisado = Supervisados.objects.get(pk = self.supervisado)
                 self.historial.tipo_distraccion = TiposDistraccion.objects.get(pk = tipo_distraccion_id)
                 foto_450 = cv2.resize(imagen, (450, 450), interpolation = cv2.INTER_CUBIC)
                 frame_jpg = cv2.imencode('.png', foto_450)
@@ -169,7 +169,7 @@ class Vigilancia:
 
     def distraccion_nino(self, distraido):
         try:
-            unSupervisado = Supervisados.objects.get(pk = self.supervisado.split('_')[0])
+            unSupervisado = Supervisados.objects.get(pk = self.supervisado)
             unSupervisado.distraido = distraido
             unSupervisado.save()
         except Exception as e:
@@ -216,9 +216,9 @@ class Vigilancia:
                         # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
                         self.supervisado = self.lista_supervisados[self.persona_identif[0]]
                         self.es_desconocido = False
-                        cv2.putText(self.video,'{}'.format(self.supervisado.split('_')[1]), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
+                        nombre = Supervisados.objects.get(pk = self.supervisado)
+                        cv2.putText(self.video,'{}'.format(nombre.persona.nombres), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
                         cv2.rectangle(self.video, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                        cv2.rectangle(self.video, (x, y - 50), (x + w, y + h + 10), (255, 0, 0), 2)
                     else:
                         if self.reconocer_personas and self.supervisado != '':
                             if self.reloj_desconocido == 0:
@@ -243,38 +243,37 @@ class Vigilancia:
                         cropped_img = np.expand_dims(np.expand_dims(rostro_48, -1), 0)
                         prediction = self.modelo_expresiones.predict(cropped_img)
                         expresion = self.expresion_facial[int(np.argmax(prediction))]
-                        supervisado_id = self.supervisado.split('_')[0]
                         # Mejorar la precisión del reconocimiento de expresiones, después de estar analizando durante 30 segundos se registra la expresión con mayor manifestación
                         if (round(time.time() - self.reloj_expresiones, 0) == 10.0 or round(time.time() - self.reloj_expresiones, 0) == 20.0): 
                             self.reloj_expresiones -= 1                    
                             self.expresiones_recono = {}
                             self.imagenes_expresiones = {}
                         contador_expresion = 1
-                        if self.expresiones_recono.get(supervisado_id, -1) != -1:
-                            if self.expresiones_recono.get(supervisado_id, -1).get(expresion, -1) != -1:
-                                contador_expresion = self.expresiones_recono.get(supervisado_id, -1).get(expresion, -1)
+                        if self.expresiones_recono.get(self.supervisado, -1) != -1:
+                            if self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1) != -1:
+                                contador_expresion = self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1)
                                 contador_expresion += 1
-                                self.expresiones_recono[supervisado_id][expresion] = contador_expresion
-                                self.imagenes_expresiones[supervisado_id][expresion] = self.imagen_expresion
+                                self.expresiones_recono[self.supervisado][expresion] = contador_expresion
+                                self.imagenes_expresiones[self.supervisado][expresion] = self.imagen_expresion
                             else:
-                                self.expresiones_recono.get(supervisado_id, -1).update({expresion: 1})
-                                self.imagenes_expresiones.get(supervisado_id, -1).update({expresion: self.imagen_expresion})
+                                self.expresiones_recono.get(self.supervisado, -1).update({expresion: 1})
+                                self.imagenes_expresiones.get(self.supervisado, -1).update({expresion: self.imagen_expresion})
                         else:
-                            self.expresiones_recono = {supervisado_id: {expresion: 1}}
-                            self.imagenes_expresiones = {supervisado_id: {expresion: self.imagen_expresion}}
-                        emociones = self.expresiones_recono.get(supervisado_id, -1)
+                            self.expresiones_recono = {self.supervisado: {expresion: 1}}
+                            self.imagenes_expresiones = {self.supervisado: {expresion: self.imagen_expresion}}
+                        emociones = self.expresiones_recono.get(self.supervisado, -1)
                         expresion = max(emociones, key = emociones.get)
                         #print(self.expresiones_recono)
-                        cv2.putText(self.video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                        cv2.putText(self.video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
                         # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
                         if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
-                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = supervisado_id) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
+                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = self.supervisado) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
                             # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
                             if(len(ultimo_historial)):
                                 if(ultimo_historial[0].observacion != expresion):
                                     self.reloj_expresiones = 0
                                     self.expresiones_recono = {}
-                                    foto_expresion = self.imagenes_expresiones.get(supervisado_id, -1).get(expresion, -1)
+                                    foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
                                     if(len(self.obtener_rostros(foto_expresion))):
                                         self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
                                     self.reloj_expresiones = 0
@@ -282,7 +281,7 @@ class Vigilancia:
                             else:
                                 self.reloj_expresiones = 0
                                 self.expresiones_recono = {}
-                                foto_expresion = self.imagenes_expresiones.get(supervisado_id, -1).get(expresion, -1)
+                                foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
                                 if(len(self.obtener_rostros(foto_expresion))):
                                     self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
 
@@ -295,7 +294,7 @@ class Vigilancia:
                         self.puntos_faciales.clear()
                         if resultados.multi_face_landmarks: # existe un rostro
                             for rostro_detec in resultados.multi_face_landmarks:
-                                self.mp_dibujo.draw_landmarks(self.video, rostro_detec, self.mp_malla_fac.FACEMESH_CONTOURS, self.conf_dibujo, self.conf_dibujo)
+                                #self.mp_dibujo.draw_landmarks(self.video, rostro_detec, self.mp_malla_fac.FACEMESH_CONTOURS, self.conf_dibujo, self.conf_dibujo)
                                 # Extraer los puntos del rostro detectado
                                 for id, puntos in enumerate(rostro_detec.landmark):
                                     al, an, c = self.video.shape
@@ -353,40 +352,39 @@ class Vigilancia:
                         if (round(time.time() - self.reloj_objetos, 0) == 10 or round(time.time() - self.reloj_objetos, 0) == 20): 
                             self.reloj_objetos -= 1                    
                             self.objetos_recono = {}
-                        supervisado_id = self.supervisado.split('_')[0]
                         for i in range(len(prediction[0])):
                             # Solo los objetos que tengan una precisión superior del 60 %
                             if (prediction[0][i] >= 0.60):
                                 # Mejorar la precisión del reconocimiento de los objetos
                                 contador_objeto = 1
                                 nombre_objeto = self.labels_objetos[i]
-                                if self.objetos_recono.get(supervisado_id, -1) != -1:
-                                    if self.objetos_recono.get(supervisado_id, -1).get(nombre_objeto, -1) != -1:
-                                        contador_objeto = self.objetos_recono.get(supervisado_id, -1).get(nombre_objeto, -1)
+                                if self.objetos_recono.get(self.supervisado, -1) != -1:
+                                    if self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1) != -1:
+                                        contador_objeto = self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1)
                                         contador_objeto += 1
-                                        self.objetos_recono[supervisado_id][nombre_objeto] = contador_objeto
-                                        self.imagenes_objetos[supervisado_id][nombre_objeto] = video_color
+                                        self.objetos_recono[self.supervisado][nombre_objeto] = contador_objeto
+                                        self.imagenes_objetos[self.supervisado][nombre_objeto] = video_color
                                     else:
-                                        self.imagenes_objetos.get(supervisado_id, -1).update({nombre_objeto: video_color})
-                                        self.objetos_recono.get(supervisado_id, -1).update({nombre_objeto: 1})
+                                        self.imagenes_objetos.get(self.supervisado, -1).update({nombre_objeto: video_color})
+                                        self.objetos_recono.get(self.supervisado, -1).update({nombre_objeto: 1})
                                 else:
-                                    self.imagenes_objetos = {supervisado_id: {nombre_objeto: video_color}}
-                                    self.objetos_recono = {supervisado_id: {nombre_objeto: 1}}
+                                    self.imagenes_objetos = {self.supervisado: {nombre_objeto: video_color}}
+                                    self.objetos_recono = {self.supervisado: {nombre_objeto: 1}}
                         # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
                         print(self.objetos_recono)
                         if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
-                            lista_objetos = self.objetos_recono.get(supervisado_id, None)
+                            lista_objetos = self.objetos_recono.get(self.supervisado, None)
                             if len(lista_objetos) > 0:
                                 for objeto in lista_objetos:
                                     # Si tiene la probabilidad de más de 5 apariciones el objeto, se procede a verificar el permiso de uso
-                                    if self.objetos_recono.get(supervisado_id).get(objeto) > 5:
+                                    if self.objetos_recono.get(self.supervisado).get(objeto) > 5:
                                         tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre__startswith = objeto))
                                         if len(tiene_permiso):
                                             print(str(objeto) + ' - CON PERMISO')
                                         else:
                                             print(str(objeto) + ' - SIN PERMISO')
                                             # se escoge la imagen del objeto desde el diccionario general de imagenes en array
-                                            self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(supervisado_id, -1).get(objeto, -1)))
+                                            self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(self.supervisado, -1).get(objeto, -1)))
                                 self.reloj_objetos = 0
                                 self.objetos_recono = {}
                                 self.imagenes_objetos = {}
@@ -421,5 +419,7 @@ class Vigilancia:
                 cv2.imshow('Video', self.video)
             cv2.destroyAllWindows()
             self.fin_vigilancia = True
+        except Supervisados.DoesNotExist:
+            pass
         except Exception as e: 
             self.fin_vigilancia = True
