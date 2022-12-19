@@ -17,126 +17,129 @@ class Vigilancia:
         self.inicializar()
 
     def inicializar(self):
-        # Atributos generales 
-        self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
-        self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
-        self.supervisado = ''
-        self.tutor_id = 0
-        self.fin_vigilancia = False
-        #self.video = None
-        self.incremen_ausente = 60
-        self.incremen_registro = 30
-        self.incremen_sueno_per = 30
-        # --- Reloj para el registro de un historial
-        # tiempo de registro de historial en segundos
-        self.tiempo_registro = self.incremen_registro
-        # tiempo de espera en ausencia de un supervisado en segundos
-        self.tiempo_espera_sup = self.incremen_ausente
-        # tiempo de inicio que aparece una persona desconocida
-        self.reloj_desconocido = 0
-        # tiempo de inicio que un supervisado se ausenta
-        self.reloj_supervisado = 0
-        # tiempo de inicio de una expresion facial
-        self.reloj_expresiones = 0
-        # tiempo de inicio que aparece un objeto
-        self.reloj_objetos = 0
+        try:
+            # Atributos generales 
+            self.ruta_rostros = 'media\\Perfiles\\img_entrenamiento'
+            self.ruta_modelos = 'Monitoreo\\modelos_entrenados\\'
+            self.supervisado = ''
+            self.tutor_id = 0
+            self.fin_vigilancia = False
+            #self.video = None
+            self.incremen_ausente = 60
+            self.incremen_registro = 30
+            self.incremen_sueno_per = 30
+            # --- Reloj para el registro de un historial
+            # tiempo de registro de historial en segundos
+            self.tiempo_registro = self.incremen_registro
+            # tiempo de espera en ausencia de un supervisado en segundos
+            self.tiempo_espera_sup = self.incremen_ausente
+            # tiempo de inicio que aparece una persona desconocida
+            self.reloj_desconocido = 0
+            # tiempo de inicio que un supervisado se ausenta
+            self.reloj_supervisado = 0
+            # tiempo de inicio de una expresion facial
+            self.reloj_expresiones = 0
+            # tiempo de inicio que aparece un objeto
+            self.reloj_objetos = 0
 
-        # --- ID de los tipos de distraccion
-        # 1. Reconocer persona
-        self.dis_pers_id = 1
-        # 2. Reconocer expresiones
-        self.dis_expre_id = 2
-        # 3. Detectar sueño
-        self.dis_suen_id = 3
-        # 4. Reconocer objetos
-        self.dis_obj_id = 4
-
-
-        # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas
-        # Cargar el clasificador de detección de rostros pre entrenado de OpenCV
-        self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
-        # Cargar el modelo para el reconocimiento facial: El reconocimiento facial se realiza mediante el clasificador de distancia y vecino más cercano
-        self.reconocedor_facial = cv2.face.LBPHFaceRecognizer_create()
-        self.reconocedor_facial.read(self.ruta_modelos + 'reconocedor_facial.xml')
-        # Se obtine la lista de personas a reconocer
-        self.lista_supervisados = os.listdir(self.ruta_rostros)
-        self.persona_identif = None
-        self.personas_desconocidas = 0
-        self.es_desconocido = False
-        self.reconocer_personas = False
-        self.tiempo_ausente = 0
+            # --- ID de los tipos de distraccion
+            # 1. Reconocer persona
+            self.dis_pers_id = 1
+            # 2. Reconocer expresiones
+            self.dis_expre_id = 2
+            # 3. Detectar sueño
+            self.dis_suen_id = 3
+            # 4. Reconocer objetos
+            self.dis_obj_id = 4
 
 
-        # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
-        # Construcción de la red neuronal convolucional
-        self.modelo_expresiones = Sequential()
-        # -- Capa de entrada
-        # Capa convolucional 1 con ReLU-activation
-        self.modelo_expresiones.add(Conv2D(32, kernel_size = (3, 3), activation='relu', input_shape = (48, 48, 1)))
-        # Capa convolucional 2 con ReLU-activation + un max poling
-        self.modelo_expresiones.add(Conv2D(64, kernel_size = (3, 3), activation='relu'))
-        # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
-        self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
-        # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
-        # (por ejemplo, 25 %) en cada ciclo de actualización de peso
-        self.modelo_expresiones.add(Dropout(0.25))
-        # -- Capa oculta
-        # Capa convolucional 3 con ReLU-activation + un max poling
-        self.modelo_expresiones.add(Conv2D(128, kernel_size = (3, 3), activation = 'relu'))
-        # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
-        self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
-        # Capa convolucional 4 con ReLU-activation + un max poling
-        self.modelo_expresiones.add(Conv2D(128, kernel_size = (3, 3), activation = 'relu'))
-        # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
-        self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
-        # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
-        # (por ejemplo, 25 %) en cada ciclo de actualización de peso
-        self.modelo_expresiones.add(Dropout(0.25))
-        # -- Capa de salida
-        self.modelo_expresiones.add(Flatten())
-        # Primera capa Densa completamente conectada con ReLU-activation.
-        self.modelo_expresiones.add(Dense(1024, activation = 'relu'))
-        # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
-        # (por ejemplo, 50 %) en cada ciclo de actualización de peso
-        self.modelo_expresiones.add(Dropout(0.5))
-        # Última capa Densa totalmente conectada con activación de softmax
-        self.modelo_expresiones.add(Dense(7, activation = 'softmax'))
-        # Diccionario que asigna a cada etiqueta una expresión facial (orden alfabético)
-        self.expresion_facial = {0: 'Enfadado', 1: 'Disgustado', 2: 'Temeroso', 3: 'Feliz', 4: 'Neutral', 5: 'Triste', 6: 'Sorprendido'}
-        # Cargar el modelo entrenado para reconocer expresiones faciales
-        self.modelo_expresiones.load_weights(self.ruta_modelos + 'model.h5')
-        self.expresiones_recono = {}
-        self.imagenes_expresiones = {}
-        self.imagen_expresion = None
-    
-
-        # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
-        # Variables de reconocimiento de sueño
-        self.parpadeando = False
-        self.tiempo_dormido = 0
-        self.sueno_permitido = self.incremen_sueno_per
-        self.inicio_sueno = 0
-        self.imagen_dormido = None
-        # Configuración del dibujo
-        self.mp_dibujo = mp.solutions.drawing_utils
-        self.conf_dibujo = self.mp_dibujo.DrawingSpec(thickness = 1, circle_radius = 1) 
-        # Objeto donde se almacena la malla facial
-        self.mp_malla_fac = mp.solutions.face_mesh
-        self.malla_facial = self.mp_malla_fac.FaceMesh(max_num_faces = 4)
-        self.puntos_faciales = []
+            # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas
+            # Cargar el clasificador de detección de rostros pre entrenado de OpenCV
+            self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
+            # Cargar el modelo para el reconocimiento facial: El reconocimiento facial se realiza mediante el clasificador de distancia y vecino más cercano
+            self.reconocedor_facial = cv2.face.LBPHFaceRecognizer_create()
+            self.reconocedor_facial.read(self.ruta_modelos + 'reconocedor_facial.xml')
+            # Se obtine la lista de personas a reconocer
+            self.lista_supervisados = os.listdir(self.ruta_rostros)
+            self.persona_identif = None
+            self.personas_desconocidas = 0
+            self.es_desconocido = False
+            self.reconocer_personas = False
+            self.tiempo_ausente = 0
 
 
-        # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
-        # Cargar el modelo
-        self.modelo_objetos = load_model(self.ruta_modelos + 'keras_model.h5')
-        # Crear el array de la forma adecuada para alimentar el modelo keras con las imágenes de 224 x 244 pixeles
-        self.data_entrena_objet = np.ndarray(shape = (1, 224, 224, 3), dtype = np.float32)
-        self.objetos_recono = {}
-        self.imagenes_objetos = {}
-        # Cargar las clases de objetos
-        self.labels_objetos = list()
-        for i in open(self.ruta_modelos + 'labels.txt', 'r', encoding='utf8'): 
-            self.labels_objetos.append(i.split()[1])
+            # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
+            # Construcción de la red neuronal convolucional
+            self.modelo_expresiones = Sequential()
+            # -- Capa de entrada
+            # Capa convolucional 1 con ReLU-activation
+            self.modelo_expresiones.add(Conv2D(32, kernel_size = (3, 3), activation='relu', input_shape = (48, 48, 1)))
+            # Capa convolucional 2 con ReLU-activation + un max poling
+            self.modelo_expresiones.add(Conv2D(64, kernel_size = (3, 3), activation='relu'))
+            # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
+            self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
+            # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
+            # (por ejemplo, 25 %) en cada ciclo de actualización de peso
+            self.modelo_expresiones.add(Dropout(0.25))
+            # -- Capa oculta
+            # Capa convolucional 3 con ReLU-activation + un max poling
+            self.modelo_expresiones.add(Conv2D(128, kernel_size = (3, 3), activation = 'relu'))
+            # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
+            self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
+            # Capa convolucional 4 con ReLU-activation + un max poling
+            self.modelo_expresiones.add(Conv2D(128, kernel_size = (3, 3), activation = 'relu'))
+            # MaxPooling2D: Operación de agrupación máxima (2 x 2) para datos espaciales 2D.
+            self.modelo_expresiones.add(MaxPooling2D(pool_size = (2, 2)))
+            # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
+            # (por ejemplo, 25 %) en cada ciclo de actualización de peso
+            self.modelo_expresiones.add(Dropout(0.25))
+            # -- Capa de salida
+            self.modelo_expresiones.add(Flatten())
+            # Primera capa Densa completamente conectada con ReLU-activation.
+            self.modelo_expresiones.add(Dense(1024, activation = 'relu'))
+            # El abandono o función Dropout() se implementa fácilmente mediante la selección aleatoria de nodos que se abandonarán con una probabilidad dada 
+            # (por ejemplo, 50 %) en cada ciclo de actualización de peso
+            self.modelo_expresiones.add(Dropout(0.5))
+            # Última capa Densa totalmente conectada con activación de softmax
+            self.modelo_expresiones.add(Dense(7, activation = 'softmax'))
+            # Diccionario que asigna a cada etiqueta una expresión facial (orden alfabético)
+            self.expresion_facial = {0: 'Enfadado', 1: 'Disgustado', 2: 'Temeroso', 3: 'Feliz', 4: 'Neutral', 5: 'Triste', 6: 'Sorprendido'}
+            # Cargar el modelo entrenado para reconocer expresiones faciales
+            self.modelo_expresiones.load_weights(self.ruta_modelos + 'model.h5')
+            self.expresiones_recono = {}
+            self.imagenes_expresiones = {}
+            self.imagen_expresion = None
+        
+
+            # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
+            # Variables de reconocimiento de sueño
+            self.parpadeando = False
+            self.tiempo_dormido = 0
+            self.sueno_permitido = self.incremen_sueno_per
+            self.inicio_sueno = 0
+            self.imagen_dormido = None
+            # Configuración del dibujo
+            self.mp_dibujo = mp.solutions.drawing_utils
+            self.conf_dibujo = self.mp_dibujo.DrawingSpec(thickness = 1, circle_radius = 1) 
+            # Objeto donde se almacena la malla facial
+            self.mp_malla_fac = mp.solutions.face_mesh
+            self.malla_facial = self.mp_malla_fac.FaceMesh(max_num_faces = 4)
+            self.puntos_faciales = []
+
+
+            # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
+            # Cargar el modelo
+            self.modelo_objetos = load_model(self.ruta_modelos + 'keras_model.h5')
+            # Crear el array de la forma adecuada para alimentar el modelo keras con las imágenes de 224 x 244 pixeles
+            self.data_entrena_objet = np.ndarray(shape = (1, 224, 224, 3), dtype = np.float32)
+            self.objetos_recono = {}
+            self.imagenes_objetos = {}
+            # Cargar las clases de objetos
+            self.labels_objetos = list()
+            for i in open(self.ruta_modelos + 'labels.txt', 'r', encoding='utf8'): 
+                self.labels_objetos.append(i.split()[1])
+        except Exception as e:
+            pass
 
 
     # se registra un historial de la monitorización
@@ -183,6 +186,7 @@ class Vigilancia:
             cap.set(6, 720) # alto video
             
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
+                self.fin_vigilancia = False
                 ret, self.video = cap.read()
                 if not ret:
                     break
@@ -413,7 +417,7 @@ class Vigilancia:
                 # Detener el proceso de monitoreo                
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.fin_vigilancia = True
-                    break
+                    return 0
                 pass
 
                 cv2.imshow('Video', self.video)
@@ -423,3 +427,4 @@ class Vigilancia:
             pass
         except Exception as e: 
             self.fin_vigilancia = True
+        return 0
