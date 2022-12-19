@@ -138,10 +138,8 @@ class vwTiposDistraccion(APIView):
                     vigilancia.tutor_id = json_data['tutor_id']
                     hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
                     hilo_vigilar.start()
-                    
                 return Response({'monitoreo': mensaje})
             except Exception as e: 
-                print(str(e))
                 return Response({'monitoreo': 'error'})
         
     def put(self, request, format = None):
