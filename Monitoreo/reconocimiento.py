@@ -24,10 +24,10 @@ class Vigilancia:
             self.supervisado = ''
             self.tutor_id = 0
             self.fin_vigilancia = False
-            #self.video = None
+            self.byte = bytes()
             self.incremen_ausente = 60
             self.incremen_registro = 30
-            self.incremen_sueno_per = 30
+            self.incremen_sueno_per = 15
             # --- Reloj para el registro de un historial
             # tiempo de registro de historial en segundos
             self.tiempo_registro = self.incremen_registro
@@ -125,6 +125,7 @@ class Vigilancia:
             self.mp_malla_fac = mp.solutions.face_mesh
             self.malla_facial = self.mp_malla_fac.FaceMesh(max_num_faces = 4)
             self.puntos_faciales = []
+            self.parpadeo = 0
 
 
             # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
@@ -180,251 +181,256 @@ class Vigilancia:
     
     def iniciar(self):
         try:
-            cap = cv2.VideoCapture(0)
-            # CUANDO SE PRUEBE CON EL DISPOSITIVO, AJUSTAR ABAJO LAS LONGITUDES CUANDO SE CIERRA Y ABRE UN OJO, 14 ES CUANDO SE USA LA RESOLUCION DE 1280 X 720
-            cap.set(3, 1280) # ancho video
-            cap.set(6, 720) # alto video
-            
+            camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
+            stream = urlopen('http://'+ camara_ip +':81/stream')
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
                 self.fin_vigilancia = False
-                ret, self.video = cap.read()
-                if not ret:
-                    break
-                # Convierte el video en escala de grises para reconocimiento de identididad y de expresiones facial
-                gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
-                # Correción de color para la malla facial que reconoce la presencia de sueño y el reconocimiento de objetos
-                frameRGB = cv2.cvtColor(self.video, cv2.COLOR_BGR2RGB)
-                # Copia del video a color para caputurar la imagen que se guardará en el historial
-                video_color = self.video.copy()
-                # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
-                rostros = self.obtener_rostros(self.video)
-                self.reconocer_personas = True if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) else False
-                # Si hay un tiempo de inicio que desapareció el supervisado y este no aparece durante el tiempo de espera configurado, se registra el historial
-                self.tiempo_ausente = round(time.time() - self.reloj_supervisado, 0)
-                if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
-                    self.tiempo_espera_sup += self.incremen_ausente
-                    minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
-                    self.distraccion_nino(True)
-                    self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
-                # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
-                self.personas_desconocidas = 0
-                # Recorriendo cada rostro
-                for (x, y, w, h) in rostros:
-                    rostro = gray[y:y + h, x:x + w]
+                self.byte += stream.read(4096)
+                a = self.byte.find(b'\xff\xd8')
+                b = self.byte.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    imagen = self.byte[a:b + 2]
+                    self.byte = self.byte[b + 2:]
+                    if imagen:
+                        self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
+                        self.video = cv2.resize(self.video, (1490, 760), interpolation = cv2.INTER_CUBIC)
+                        # Convierte el video en escala de grises para reconocimiento de identididad y de expresiones facial
+                        gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
+                        # Correción de color para la malla facial que reconoce la presencia de sueño y el reconocimiento de objetos
+                        frameRGB = cv2.cvtColor(self.video, cv2.COLOR_BGR2RGB)
+                        # Copia del video a color para caputurar la imagen que se guardará en el historial
+                        video_color = self.video.copy()
+                        # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
+                        rostros = self.obtener_rostros(self.video)
+                        self.reconocer_personas = True if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) else False
+                        # Si hay un tiempo de inicio que desapareció el supervisado y este no aparece durante el tiempo de espera configurado, se registra el historial
+                        self.tiempo_ausente = round(time.time() - self.reloj_supervisado, 0)
+                        if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
+                            self.tiempo_espera_sup += self.incremen_ausente
+                            minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
+                            self.distraccion_nino(True)
+                            self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
+                        # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
+                        self.personas_desconocidas = 0
+                        # Recorriendo cada rostro
+                        for (x, y, w, h) in rostros:
+                            rostro = gray[y:y + h, x:x + w]
 
 
-                    # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se realiza el reconocimiento facial para verificar si es una persona registrada
-                    rostro_150 = cv2.resize(rostro, (150, 150), interpolation = cv2.INTER_CUBIC)
-                    self.persona_identif = self.reconocedor_facial.predict(rostro_150)
-                    if self.persona_identif[1] < 70:
-                        # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
-                        self.supervisado = self.lista_supervisados[self.persona_identif[0]]
-                        self.es_desconocido = False
-                        nombre = Supervisados.objects.get(pk = self.supervisado)
-                        cv2.putText(self.video,'{}'.format(nombre.persona.nombres), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
-                        cv2.rectangle(self.video, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    else:
-                        if self.reconocer_personas and self.supervisado != '':
-                            if self.reloj_desconocido == 0:
-                                self.reloj_desconocido = time.time()
-                            self.personas_desconocidas += 1
-                            self.es_desconocido = True
-                            cv2.putText(self.video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
-                            cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 0, 255), 2)
-                            if (round(time.time() - self.reloj_desconocido, 0) >= self.tiempo_registro):
-                                self.reloj_desconocido = 0
-                                img_desconocido = video_color[y:y + h, x:x + w]
-                                if(len(self.obtener_rostros(img_desconocido))):
-                                    self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id, img_desconocido)
-
-
-                    # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
-                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))) and self.supervisado != '' and not self.es_desconocido:
-                        if self.reloj_expresiones == 0:
-                            self.reloj_expresiones = time.time()
-                        rostro_48 = cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC)
-                        self.imagen_expresion = video_color[y:y + h, x:x + w]
-                        cropped_img = np.expand_dims(np.expand_dims(rostro_48, -1), 0)
-                        prediction = self.modelo_expresiones.predict(cropped_img)
-                        expresion = self.expresion_facial[int(np.argmax(prediction))]
-                        # Mejorar la precisión del reconocimiento de expresiones, después de estar analizando durante 30 segundos se registra la expresión con mayor manifestación
-                        if (round(time.time() - self.reloj_expresiones, 0) == 10.0 or round(time.time() - self.reloj_expresiones, 0) == 20.0): 
-                            self.reloj_expresiones -= 1                    
-                            self.expresiones_recono = {}
-                            self.imagenes_expresiones = {}
-                        contador_expresion = 1
-                        if self.expresiones_recono.get(self.supervisado, -1) != -1:
-                            if self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1) != -1:
-                                contador_expresion = self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1)
-                                contador_expresion += 1
-                                self.expresiones_recono[self.supervisado][expresion] = contador_expresion
-                                self.imagenes_expresiones[self.supervisado][expresion] = self.imagen_expresion
+                            # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se realiza el reconocimiento facial para verificar si es una persona registrada
+                            rostro_150 = cv2.resize(rostro, (150, 150), interpolation = cv2.INTER_CUBIC)
+                            self.persona_identif = self.reconocedor_facial.predict(rostro_150)
+                            if self.persona_identif[1] < 70:
+                                # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
+                                self.supervisado = self.lista_supervisados[self.persona_identif[0]]
+                                self.es_desconocido = False
+                                nombre = Supervisados.objects.get(pk = self.supervisado)
+                                cv2.putText(self.video,'{}'.format(nombre.persona.nombres), (x, y - 25), 2, 1.1, (0, 255, 0), 1, cv2.LINE_AA)
+                                cv2.rectangle(self.video, (x, y), (x + w, y + h), (0, 255, 0), 2)
                             else:
-                                self.expresiones_recono.get(self.supervisado, -1).update({expresion: 1})
-                                self.imagenes_expresiones.get(self.supervisado, -1).update({expresion: self.imagen_expresion})
-                        else:
-                            self.expresiones_recono = {self.supervisado: {expresion: 1}}
-                            self.imagenes_expresiones = {self.supervisado: {expresion: self.imagen_expresion}}
-                        emociones = self.expresiones_recono.get(self.supervisado, -1)
-                        expresion = max(emociones, key = emociones.get)
-                        #print(self.expresiones_recono)
-                        cv2.putText(self.video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
-                        # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
-                        if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
-                            ultimo_historial = (Historial.objects.filter(Q(supervisado_id = self.supervisado) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
-                            # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
-                            if(len(ultimo_historial)):
-                                if(ultimo_historial[0].observacion != expresion):
-                                    self.reloj_expresiones = 0
+                                if self.reconocer_personas and self.supervisado != '':
+                                    if self.reloj_desconocido == 0:
+                                        self.reloj_desconocido = time.time()
+                                    self.personas_desconocidas += 1
+                                    self.es_desconocido = True
+                                    cv2.putText(self.video,'Desconocido',(x, y - 20), 2, 0.8,(0, 0, 255),1,cv2.LINE_AA)
+                                    cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 0, 255), 2)
+                                    if (round(time.time() - self.reloj_desconocido, 0) >= self.tiempo_registro):
+                                        self.reloj_desconocido = 0
+                                        img_desconocido = video_color[y:y + h, x:x + w]
+                                        if(len(self.obtener_rostros(img_desconocido))):
+                                            self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id, img_desconocido)
+
+
+                            # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
+                            if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_expre_id))) and self.supervisado != '' and not self.es_desconocido:
+                                if self.reloj_expresiones == 0:
+                                    self.reloj_expresiones = time.time()
+                                rostro_48 = cv2.resize(rostro, (48, 48), interpolation = cv2.INTER_CUBIC)
+                                self.imagen_expresion = video_color[y:y + h, x:x + w]
+                                cropped_img = np.expand_dims(np.expand_dims(rostro_48, -1), 0)
+                                prediction = self.modelo_expresiones.predict(cropped_img)
+                                expresion = self.expresion_facial[int(np.argmax(prediction))]
+                                # Mejorar la precisión del reconocimiento de expresiones, después de estar analizando durante 30 segundos se registra la expresión con mayor manifestación
+                                if (round(time.time() - self.reloj_expresiones, 0) == 10.0 or round(time.time() - self.reloj_expresiones, 0) == 20.0): 
+                                    self.reloj_expresiones -= 1                    
                                     self.expresiones_recono = {}
-                                    foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
-                                    if(len(self.obtener_rostros(foto_expresion))):
-                                        self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
-                                    self.reloj_expresiones = 0
-                                    self.expresiones_recono = {}
-                            else:
-                                self.reloj_expresiones = 0
-                                self.expresiones_recono = {}
-                                foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
-                                if(len(self.obtener_rostros(foto_expresion))):
-                                    self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
-
-
-                    # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
-                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_suen_id))):
-                        # Observamos los resultados
-                        resultados = self.malla_facial.process(frameRGB)
-                        # Se limpia la lista para los nuevos puntos faciales
-                        self.puntos_faciales.clear()
-                        if resultados.multi_face_landmarks: # existe un rostro
-                            for rostro_detec in resultados.multi_face_landmarks:
-                                #self.mp_dibujo.draw_landmarks(self.video, rostro_detec, self.mp_malla_fac.FACEMESH_CONTOURS, self.conf_dibujo, self.conf_dibujo)
-                                # Extraer los puntos del rostro detectado
-                                for id, puntos in enumerate(rostro_detec.landmark):
-                                    al, an, c = self.video.shape
-                                    punto_x, punto_y = int(puntos.x * an), int(puntos.y * al)
-                                    self.puntos_faciales.append([id, punto_x, punto_y])
-                                    if len(self.puntos_faciales) == 468:
-                                        # Ojo derecho
-                                        x1, y1 = self.puntos_faciales[145][1:]
-                                        x2, y2 = self.puntos_faciales[159][1:]
-                                        longitud1 = math.hypot(x2 - x1, y2 -y1)
-                                        # Ojo izquierdo
-                                        x3, y3 = self.puntos_faciales[374][1:]
-                                        x4, y4 = self.puntos_faciales[386][1:]
-                                        longitud2 = math.hypot(x4 - x3, y4 -y3)
-                                        # Contar parpadeos
-                                        if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
-                                            # Cerró los ojos
-                                            self.parpadeando = True
-                                            self.inicio_sueno = time.time()
-                                            # Justo el momento que cerró los ojos se captura la imagen
-                                            self.imagen_dormido = video_color[y:y + h, x:x + w]
-                                            #self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de minutos y segundos', self.dis_suen_id)
-                                        elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
-                                            # Abrió los ojos
-                                            self.parpadeando = False
-                                            self.inicio_sueno = 0
-                                            self.sueno_permitido = self.incremen_sueno_per
-                                            self.distraccion_nino(False)
-                                        # Temporizador
-                                        if self.inicio_sueno != 0:
-                                            self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
-                                            if self.tiempo_dormido >= self.sueno_permitido:
-                                                self.sueno_permitido += self.incremen_sueno_per
-                                                if(len(self.obtener_rostros(self.imagen_dormido))):
-                                                    minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
-                                                    self.distraccion_nino(True)
-                                                    self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
-                                                
-
-
-                    # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
-                    if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_obj_id))) and self.supervisado != '':
-                        if self.reloj_objetos == 0:
-                            self.reloj_objetos = time.time()
-                        frame = cv2.flip(self.video, 1)
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        imagen_objetos = cv2.resize(frame, (224, 224), fx=0, fy=0, interpolation = cv2.INTER_AREA)
-                        # convertir la imagen en un array de numpy
-                        image_array = np.asarray(imagen_objetos)
-                        # normalizar la imagen
-                        self.data_entrena_objet[0] = (image_array.astype(np.float32) / 127.0) - 1
-                        # realizar reconocimiento de objetos
-                        prediction = self.modelo_objetos.predict(self.data_entrena_objet)
-                        # Cada 10 segundos hasta cumplir el tiempo de registro se limpia el diccionario de objetos reconocidos
-                        if (round(time.time() - self.reloj_objetos, 0) == 10 or round(time.time() - self.reloj_objetos, 0) == 20): 
-                            self.reloj_objetos -= 1                    
-                            self.objetos_recono = {}
-                        for i in range(len(prediction[0])):
-                            # Solo los objetos que tengan una precisión superior del 60 %
-                            if (prediction[0][i] >= 0.60):
-                                # Mejorar la precisión del reconocimiento de los objetos
-                                contador_objeto = 1
-                                nombre_objeto = self.labels_objetos[i]
-                                if self.objetos_recono.get(self.supervisado, -1) != -1:
-                                    if self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1) != -1:
-                                        contador_objeto = self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1)
-                                        contador_objeto += 1
-                                        self.objetos_recono[self.supervisado][nombre_objeto] = contador_objeto
-                                        self.imagenes_objetos[self.supervisado][nombre_objeto] = video_color
+                                    self.imagenes_expresiones = {}
+                                contador_expresion = 1
+                                if self.expresiones_recono.get(self.supervisado, -1) != -1:
+                                    if self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1) != -1:
+                                        contador_expresion = self.expresiones_recono.get(self.supervisado, -1).get(expresion, -1)
+                                        contador_expresion += 1
+                                        self.expresiones_recono[self.supervisado][expresion] = contador_expresion
+                                        self.imagenes_expresiones[self.supervisado][expresion] = self.imagen_expresion
                                     else:
-                                        self.imagenes_objetos.get(self.supervisado, -1).update({nombre_objeto: video_color})
-                                        self.objetos_recono.get(self.supervisado, -1).update({nombre_objeto: 1})
+                                        self.expresiones_recono.get(self.supervisado, -1).update({expresion: 1})
+                                        self.imagenes_expresiones.get(self.supervisado, -1).update({expresion: self.imagen_expresion})
                                 else:
-                                    self.imagenes_objetos = {self.supervisado: {nombre_objeto: video_color}}
-                                    self.objetos_recono = {self.supervisado: {nombre_objeto: 1}}
-                        # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
-                        print(self.objetos_recono)
-                        if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
-                            lista_objetos = self.objetos_recono.get(self.supervisado, None)
-                            if len(lista_objetos) > 0:
-                                for objeto in lista_objetos:
-                                    # Si tiene la probabilidad de más de 5 apariciones el objeto, se procede a verificar el permiso de uso
-                                    if self.objetos_recono.get(self.supervisado).get(objeto) > 5:
-                                        tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre__startswith = objeto))
-                                        if len(tiene_permiso):
-                                            print(str(objeto) + ' - CON PERMISO')
+                                    self.expresiones_recono = {self.supervisado: {expresion: 1}}
+                                    self.imagenes_expresiones = {self.supervisado: {expresion: self.imagen_expresion}}
+                                emociones = self.expresiones_recono.get(self.supervisado, -1)
+                                expresion = max(emociones, key = emociones.get)
+                                #print(self.expresiones_recono)
+                                cv2.putText(self.video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                                # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
+                                if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
+                                    ultimo_historial = (Historial.objects.filter(Q(supervisado_id = self.supervisado) & Q(tipo_distraccion_id = self.dis_expre_id)).order_by('-fecha_hora'))
+                                    # Solo se registra ún historial si la expresión facial reconocida es diferente a la última registrada
+                                    if(len(ultimo_historial)):
+                                        if(ultimo_historial[0].observacion != expresion):
+                                            self.reloj_expresiones = 0
+                                            self.expresiones_recono = {}
+                                            foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
+                                            if(len(self.obtener_rostros(foto_expresion))):
+                                                self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
+                                            self.reloj_expresiones = 0
+                                            self.expresiones_recono = {}
+                                    else:
+                                        self.reloj_expresiones = 0
+                                        self.expresiones_recono = {}
+                                        foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
+                                        if(len(self.obtener_rostros(foto_expresion))):
+                                            self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
+
+
+                            # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
+                            if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_suen_id))):
+                                # Observamos los resultados
+                                resultados = self.malla_facial.process(frameRGB)
+                                # Se limpia la lista para los nuevos puntos faciales
+                                self.puntos_faciales.clear()
+                                if resultados.multi_face_landmarks: # existe un rostro
+                                    for rostro_detec in resultados.multi_face_landmarks:
+                                        self.mp_dibujo.draw_landmarks(self.video, rostro_detec, self.mp_malla_fac.FACEMESH_CONTOURS, self.conf_dibujo, self.conf_dibujo)
+                                        # Extraer los puntos del rostro detectado
+                                        for id, puntos in enumerate(rostro_detec.landmark):
+                                            al, an, c = self.video.shape
+                                            punto_x, punto_y = int(puntos.x * an), int(puntos.y * al)
+                                            self.puntos_faciales.append([id, punto_x, punto_y])
+                                            if len(self.puntos_faciales) == 468:
+                                                # Ojo derecho
+                                                x1, y1 = self.puntos_faciales[145][1:]
+                                                x2, y2 = self.puntos_faciales[159][1:]
+                                                longitud1 = math.hypot(x2 - x1, y2 -y1)
+                                                # Ojo izquierdo
+                                                x3, y3 = self.puntos_faciales[374][1:]
+                                                x4, y4 = self.puntos_faciales[386][1:]
+                                                longitud2 = math.hypot(x4 - x3, y4 -y3)
+                                                # Contar parpadeos
+                                                cv2.putText(self.video, f'Parpadeos: {int(self.parpadeo)}', (300, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                                                if longitud1 <= 14 and longitud2 <= 14 and self.parpadeando == False: 
+                                                    # Cerró los ojos
+                                                    self.parpadeo = self.parpadeo + 1
+                                                    self.parpadeando = True
+                                                    self.inicio_sueno = time.time()
+                                                    # Justo el momento que cerró los ojos se captura la imagen
+                                                    self.imagen_dormido = video_color[y:y + h, x:x + w]
+                                                elif longitud1 > 14 and longitud2 > 14 and self.parpadeando == True: 
+                                                    # Abrió los ojos
+                                                    self.parpadeando = False
+                                                    self.inicio_sueno = 0
+                                                    self.sueno_permitido = self.incremen_sueno_per
+                                                    self.distraccion_nino(False)
+                                                # Temporizador
+                                                if self.inicio_sueno != 0:
+                                                    self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
+                                                    if self.tiempo_dormido >= self.sueno_permitido:
+                                                        self.sueno_permitido += self.incremen_sueno_per
+                                                        if(len(self.obtener_rostros(self.imagen_dormido))):
+                                                            minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
+                                                            self.distraccion_nino(True)
+                                                            self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
+                                                        
+
+
+                            # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
+                            if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_obj_id))) and self.supervisado != '':
+                                if self.reloj_objetos == 0:
+                                    self.reloj_objetos = time.time()
+                                frame = cv2.flip(self.video, 1)
+                                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                imagen_objetos = cv2.resize(frame, (224, 224), fx=0, fy=0, interpolation = cv2.INTER_AREA)
+                                # convertir la imagen en un array de numpy
+                                image_array = np.asarray(imagen_objetos)
+                                # normalizar la imagen
+                                self.data_entrena_objet[0] = (image_array.astype(np.float32) / 127.0) - 1
+                                # realizar reconocimiento de objetos
+                                prediction = self.modelo_objetos.predict(self.data_entrena_objet)
+                                # Cada 10 segundos hasta cumplir el tiempo de registro se limpia el diccionario de objetos reconocidos
+                                if (round(time.time() - self.reloj_objetos, 0) == 10 or round(time.time() - self.reloj_objetos, 0) == 20): 
+                                    self.reloj_objetos -= 1                    
+                                    self.objetos_recono = {}
+                                for i in range(len(prediction[0])):
+                                    # Solo los objetos que tengan una precisión superior del 60 %
+                                    if (prediction[0][i] >= 0.60):
+                                        # Mejorar la precisión del reconocimiento de los objetos
+                                        contador_objeto = 1
+                                        nombre_objeto = self.labels_objetos[i]
+                                        if self.objetos_recono.get(self.supervisado, -1) != -1:
+                                            if self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1) != -1:
+                                                contador_objeto = self.objetos_recono.get(self.supervisado, -1).get(nombre_objeto, -1)
+                                                contador_objeto += 1
+                                                self.objetos_recono[self.supervisado][nombre_objeto] = contador_objeto
+                                                self.imagenes_objetos[self.supervisado][nombre_objeto] = video_color
+                                            else:
+                                                self.imagenes_objetos.get(self.supervisado, -1).update({nombre_objeto: video_color})
+                                                self.objetos_recono.get(self.supervisado, -1).update({nombre_objeto: 1})
                                         else:
-                                            print(str(objeto) + ' - SIN PERMISO')
-                                            # se escoge la imagen del objeto desde el diccionario general de imagenes en array
-                                            self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(self.supervisado, -1).get(objeto, -1)))
-                                self.reloj_objetos = 0
-                                self.objetos_recono = {}
-                                self.imagenes_objetos = {}
+                                            self.imagenes_objetos = {self.supervisado: {nombre_objeto: video_color}}
+                                            self.objetos_recono = {self.supervisado: {nombre_objeto: 1}}
+                                # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
+                                print(self.objetos_recono)
+                                if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
+                                    lista_objetos = self.objetos_recono.get(self.supervisado, None)
+                                    if len(lista_objetos) > 0:
+                                        for objeto in lista_objetos:
+                                            # Si tiene la probabilidad de más de 5 apariciones el objeto, se procede a verificar el permiso de uso
+                                            if self.objetos_recono.get(self.supervisado).get(objeto) > 5:
+                                                tiene_permiso = PermisosObjetos.objects.filter(Q(tutor_id = self.tutor_id) & Q(objeto__nombre__startswith = objeto))
+                                                if len(tiene_permiso):
+                                                    print(str(objeto) + ' - CON PERMISO')
+                                                else:
+                                                    print(str(objeto) + ' - SIN PERMISO')
+                                                    # se escoge la imagen del objeto desde el diccionario general de imagenes en array
+                                                    self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(self.supervisado, -1).get(objeto, -1)))
+                                        self.reloj_objetos = 0
+                                        self.objetos_recono = {}
+                                        self.imagenes_objetos = {}
+                                    
+
+                        # Reiniciando variables 
+                        if self.reconocer_personas and self.supervisado != '':
+                            # Si no hay personas desconocidas se cancela el cronómetro
+                            if self.personas_desconocidas == 0:
+                                self.reloj_desconocido = 0
+                            # Si todos los rostros son desconocidos, pero antes si hubo un supervisado, se inicia el cronómetro
+                            if self.reloj_supervisado == 0 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas):
+                                # Se fue el supervisado
+                                self.reloj_supervisado = time.time()  
+                            elif len(rostros) != self.personas_desconocidas and self.reloj_supervisado > 0:
+                                # Llegó el supervisado
+                                self.reloj_supervisado = 0
+                                self.tiempo_espera_sup = self.incremen_ausente
+                                self.distraccion_nino(False)
+                            # Mostrar mensaje de presencia / ausencia
+                            if self.reloj_supervisado == 0:
+                                cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                            else:
+                                cv2.putText(self.video, 'Ausente, conteo iniciado!', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                             
+                        # Detener el proceso de monitoreo                
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            self.fin_vigilancia = True
+                            return 0
+                        pass
 
-                # Reiniciando variables 
-                if self.reconocer_personas and self.supervisado != '':
-                    # Si no hay personas desconocidas se cancela el cronómetro
-                    if self.personas_desconocidas == 0:
-                        self.reloj_desconocido = 0
-                    # Si todos los rostros son desconocidos, pero antes si hubo un supervisado, se inicia el cronómetro
-                    if self.reloj_supervisado == 0 and (len(rostros) == 0 or len(rostros) == self.personas_desconocidas):
-                        # Se fue el supervisado
-                        self.reloj_supervisado = time.time()  
-                    elif len(rostros) != self.personas_desconocidas and self.reloj_supervisado > 0:
-                        # Llegó el supervisado
-                        self.reloj_supervisado = 0
-                        self.tiempo_espera_sup = self.incremen_ausente
-                        self.distraccion_nino(False)
-                    # Mostrar mensaje de presencia / ausencia
-                    if self.reloj_supervisado == 0:
-                        cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                    else:
-                        cv2.putText(self.video, 'Ausente, conteo iniciado!', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                    
-                # Detener el proceso de monitoreo                
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.fin_vigilancia = True
-                    return 0
-                pass
-
-                cv2.imshow('Video', self.video)
+                        cv2.imshow('Video', self.video)
             cv2.destroyAllWindows()
             self.fin_vigilancia = True
         except Supervisados.DoesNotExist:
             pass
         except Exception as e: 
+            print('error monitoreo ' ,str(e))
             self.fin_vigilancia = True
         return 0

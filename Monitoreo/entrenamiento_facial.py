@@ -23,36 +23,40 @@ class EntrenamiFacial:
         self.imagenes_capturar = 400
         self.cont_imagenes = 0
         self.fin_entrenamiento = False
+        self.byte = bytes()
 
     def entrenar(self):
         try:
             self.supervisado = Supervisados.objects.get(pk = self.supervisado_id)
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk), exist_ok = True)
-            # se crean las 200 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
-            cap = cv2.VideoCapture(0)
-            cap.set(3, 1280) # ancho video
-            cap.set(6, 720) # alto video
+            # se crean las 400 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
+            camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
+            stream = urlopen('http://'+ camara_ip +':81/stream')
             while True:
-                ret, self.video = cap.read()
-                if not ret:
-                    break
-
-                #self.video =  imutils.resize(self.video, width = 640)
-                gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
-                auxFrame = self.video.copy()
-                rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
-                cv2.putText(self.video, 'Capturando {0} fotos de 400'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                for (x, y, w, h) in rostros:
-                    cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
-                    rostro = auxFrame[y:y + h, x:x + w]
-                    rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
-                    cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
-                    self.cont_imagenes += 1
-                cv2.imshow('Video', self.video)
-                k =  cv2.waitKey(1)
-                if k == 27 or self.cont_imagenes >= self.imagenes_capturar:
-                    cv2.destroyAllWindows()
-                    break
+                self.byte += stream.read(4096)
+                a = self.byte.find(b'\xff\xd8')
+                b = self.byte.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    imagen = self.byte[a:b + 2]
+                    self.byte = self.byte[b + 2:]
+                    if imagen:
+                        self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
+                        self.video = cv2.resize(self.video, (1490, 760), interpolation = cv2.INTER_CUBIC)
+                        gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
+                        auxFrame = self.video.copy()
+                        rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
+                        cv2.putText(self.video, 'Capturando {0} fotos de 400'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        for (x, y, w, h) in rostros:
+                            cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
+                            rostro = auxFrame[y:y + h, x:x + w]
+                            rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
+                            cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
+                            self.cont_imagenes += 1
+                        cv2.imshow('Video', self.video)
+                        k =  cv2.waitKey(1)
+                        if k == 27 or self.cont_imagenes >= self.imagenes_capturar:
+                            cv2.destroyAllWindows()
+                            break
             # entrenamiento del modelo con todas las imágenes
             lista_personas = os.listdir(self.ruta_rostros)
             for persona in lista_personas:
@@ -68,6 +72,6 @@ class EntrenamiFacial:
             self.fin_entrenamiento = True
             return 'entrenado'
         except Camaras.DoesNotExist or Supervisados.DoesNotExist:
-            return 'error'
+            return 'camara no encontrada'
         except Exception as e: 
             return 'error'
