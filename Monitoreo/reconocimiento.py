@@ -271,7 +271,6 @@ class Vigilancia:
                                     self.imagenes_expresiones = {self.supervisado: {expresion: self.imagen_expresion}}
                                 emociones = self.expresiones_recono.get(self.supervisado, -1)
                                 expresion = max(emociones, key = emociones.get)
-                                #print(self.expresiones_recono)
                                 cv2.putText(self.video, expresion, (x + 20, y - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                                 # Se verifica si ya cumple con el tiempo estimado para proceder el registro del historial
                                 if (round(time.time() - (self.reloj_expresiones + 2), 0) >= (self.tiempo_registro)):
@@ -431,6 +430,6 @@ class Vigilancia:
         except Supervisados.DoesNotExist:
             pass
         except Exception as e: 
-            print('error monitoreo ' ,str(e))
+            print('Error durante el monitoreo: ' ,str(e))
             self.fin_vigilancia = True
         return 0

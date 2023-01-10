@@ -132,7 +132,6 @@ class vwTiposDistraccion(APIView):
                 json_data = json.loads(request.body.decode('utf-8'))
                 monitoreo = Monitoreo()
                 fallo, mensaje = monitoreo.activar(json_data)
-                print(vigilancia.fin_vigilancia)
                 if fallo != 'error' and (vigilancia.fin_vigilancia or len(Monitoreo.objects.filter(tutor_id = json_data['tutor_id'])) == 1):
                     vigilancia.inicializar()
                     vigilancia.tutor_id = json_data['tutor_id']

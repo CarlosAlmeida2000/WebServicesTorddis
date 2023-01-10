@@ -11,7 +11,7 @@ class TiposDistraccion(models.Model):
     nombre = models.CharField(max_length = 25)
 
 class Camaras(models.Model):
-    direccion_ruta = models.CharField(max_length = 150, unique = True)
+    direccion_ruta = models.CharField(max_length = 150)
     habilitada = models.BooleanField()
     tutor = models.ForeignKey('Persona.Tutores', on_delete = models.PROTECT, related_name = "camaras_tutor")
 
@@ -40,9 +40,6 @@ class Camaras(models.Model):
                 return 'El tutor ya tiene una cámara'    
             self.save()
             return 'guardada'
-        except IntegrityError:
-            transaction.savepoint_rollback(punto_guardado)
-            return 'cámara repetida'
         except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -193,12 +190,10 @@ class Monitoreo(models.Model):
     def existe_distraccion(request):
         try:
             if 'direccion_ruta' in request.GET:
-                if Supervisados.objects.filter(Q(tutor_id = Camaras.objects.get(direccion_ruta = request.GET['direccion_ruta']).tutor_id) & Q(distraido = True)).count() > 0:
+                if Supervisados.objects.filter(Q(tutor_id = Camaras.objects.filter(direccion_ruta = request.GET['direccion_ruta'])[0].tutor.id) & Q(distraido = True)).count() > 0:
                     return True
                 return False
             return 'error'
-        except Camaras.DoesNotExist:
-            return 'no existe la camara'
         except Exception as e: 
             return 'error'
 

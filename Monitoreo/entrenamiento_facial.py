@@ -20,7 +20,7 @@ class EntrenamiFacial:
         self.datos_rostros = []
         self.cont_etiquetas = 0
         self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
-        self.imagenes_capturar = 400
+        self.imagenes_capturar = 100
         self.cont_imagenes = 0
         self.fin_entrenamiento = False
         self.byte = bytes()
@@ -45,7 +45,7 @@ class EntrenamiFacial:
                         gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                         auxFrame = self.video.copy()
                         rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
-                        cv2.putText(self.video, 'Capturando {0} fotos de 400'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        cv2.putText(self.video, 'Capturando {0} fotos de 100'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                         for (x, y, w, h) in rostros:
                             cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
                             rostro = auxFrame[y:y + h, x:x + w]
