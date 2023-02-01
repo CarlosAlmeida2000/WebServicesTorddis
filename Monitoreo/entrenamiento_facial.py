@@ -29,7 +29,6 @@ class EntrenamiFacial:
         try:
             self.supervisado = Supervisados.objects.get(pk = self.supervisado_id)
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk), exist_ok = True)
-            # se crean las 400 imágenes de la persona supervisada para después entrenar el modelo de reconocimiento facial
             camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
             stream = urlopen('http://'+ camara_ip +':81/stream')
             while True:
@@ -45,12 +44,14 @@ class EntrenamiFacial:
                         gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                         auxFrame = self.video.copy()
                         rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
-                        cv2.putText(self.video, 'Capturando {0} fotos de 100'.format((self.cont_imagenes + 1)), (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        cv2.putText(self.video, 'Capturando {0} fotos de 100'.format((self.cont_imagenes + 1)), 
+                        (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                         for (x, y, w, h) in rostros:
                             cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
                             rostro = auxFrame[y:y + h, x:x + w]
                             rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
-                            cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '/rotro_{}.png'.format(self.cont_imagenes), rostro)
+                            cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '/rotro_{}.png'
+                            .format(self.cont_imagenes), rostro)
                             self.cont_imagenes += 1
                         cv2.imshow('Video', self.video)
                         k =  cv2.waitKey(1)

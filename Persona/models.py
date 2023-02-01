@@ -16,7 +16,7 @@ class Personas(models.Model):
     foto_perfil = models.ImageField(upload_to = 'Perfiles', null = True, blank = True)
     
     @staticmethod
-    def calcular_edad(fecha_naci):
+    def calcularEdad(fecha_naci):
         fecha_inicio = date(int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).year), 
             int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).month), 
             int((datetime.strptime(str(fecha_naci), '%Y-%m-%d')).day))
@@ -155,7 +155,7 @@ class Supervisados(models.Model):
                     file.ruta = supervisados[u]['persona__foto_perfil']
                     supervisados[u]['persona__foto_perfil'] = file.get_base64()
                 # Calcular edad del supervisado
-                anios, meses, dias = Personas.calcular_edad(supervisados[u]['persona__fecha_nacimiento'])
+                anios, meses, dias = Personas.calcularEdad(supervisados[u]['persona__fecha_nacimiento'])
                 supervisados[u]['persona__edad'] = (str(anios) + ' años ' + str(meses) + ' meses ' + str(dias) + ' días')
             return supervisados
         except Exception as e: 
@@ -168,7 +168,7 @@ class Supervisados(models.Model):
                 # Es una nueva persona
                 self.persona = Personas()
             # Calcular edad del supervisado
-            anios, meses, dias = Personas.calcular_edad(json_data['persona__fecha_nacimiento'])
+            anios, meses, dias = Personas.calcularEdad(json_data['persona__fecha_nacimiento'])
             if anios <= 12:
                 persona_guardada, self.persona = self.persona.guardar(json_data)
                 if(persona_guardada == 'si'):

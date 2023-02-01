@@ -1,10 +1,12 @@
 from django.db.models import Q, Value, BooleanField, IntegerField
 from Persona.models import Supervisados, Tutores
+from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db import transaction
 from Persona.image import Image
 from django.db import models
 import datetime
+import cv2
 
 # Create your models here.
 class TiposDistraccion(models.Model):
@@ -187,7 +189,7 @@ class Monitoreo(models.Model):
             return 'error'
     
     @staticmethod
-    def existe_distraccion(request):
+    def existeDistraccion(request):
         try:
             if 'direccion_ruta' in request.GET:
                 if Supervisados.objects.filter(Q(tutor_id = Camaras.objects.filter(direccion_ruta = request.GET['direccion_ruta'])[0].tutor.id) & Q(distraido = True)).count() > 0:
@@ -246,6 +248,23 @@ class Historial(models.Model):
         except Exception as e: 
             return {'historial': 'error'}
     
+    @staticmethod
+    def crear(self, supervisado_id, observacion, tipo_distraccion_id, imagen):
+        try:
+            historial = Historial()
+            historial.fecha_hora = datetime.now()
+            historial.observacion = observacion
+            historial.supervisado = Supervisados.objects.get(pk = supervisado_id)
+            historial.tipo_distraccion = TiposDistraccion.objects.get(pk = tipo_distraccion_id)
+            foto_450 = cv2.resize(imagen, (450, 450), interpolation = cv2.INTER_CUBIC)
+            frame_jpg = cv2.imencode('.png', foto_450)
+            file = ContentFile(frame_jpg[1]) 
+            historial.imagen_evidencia.save('dis_' + str(tipo_distraccion_id) + '_id_' + str(historial.supervisado.persona.id) + '_' + str(historial.fecha_hora) + '.png', file, save = True)
+            historial.save()
+            return True
+        except Exception as e:
+            return False
+
     @staticmethod
     def graficos(request):
         try:

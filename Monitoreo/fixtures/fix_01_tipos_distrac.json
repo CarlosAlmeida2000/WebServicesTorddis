@@ -3,7 +3,7 @@
         "model": "Monitoreo.tiposdistraccion",
         "pk": 1,
         "fields": {
-            "nombre": "Reconocer personas"
+            "nombre": "Reconocer rostro"
         }
     },
     {
@@ -17,14 +17,14 @@
         "model": "Monitoreo.tiposdistraccion",
         "pk": 3,
         "fields": {
-            "nombre": "Reconocer sueño"
+            "nombre": "Detectar sueño"
         }
     },
     {
         "model": "Monitoreo.tiposdistraccion",
         "pk": 4,
         "fields": {
-            "nombre": "Detectar objetos"
+            "nombre": "Reconocer objetos"
         }
     }
 ]

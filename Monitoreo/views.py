@@ -1,5 +1,5 @@
 from Monitoreo.entrenamiento_facial import EntrenamiFacial
-from Monitoreo.reconocimiento import Vigilancia
+from Monitoreo.reconocimiento import Distraccion
 from django.http import StreamingHttpResponse,HttpResponseServerError
 from django.shortcuts import render
 from rest_framework.response import Response
@@ -8,7 +8,7 @@ import json, cv2, threading
 from .models import *
 
 # Create your views here.
-vigilancia = Vigilancia()
+distaccion = Distraccion()
 entrenar_rostros = EntrenamiFacial()
 
 class vWvideo(APIView):
@@ -25,8 +25,8 @@ class vWvideo(APIView):
     
     @staticmethod
     def trans_monitoreo():
-        while not vigilancia.fin_vigilancia:
-            _, png = cv2.imencode('.png', vigilancia.video)
+        while not distaccion.fin_vigilancia:
+            _, png = cv2.imencode('.png', distaccion.video)
             imagen = png.tobytes()
             yield (b'--frame\r\n'
                 b'Content-Type: image/png\r\n\r\n' + imagen + b'\r\n\r\n')
@@ -132,10 +132,10 @@ class vwTiposDistraccion(APIView):
                 json_data = json.loads(request.body.decode('utf-8'))
                 monitoreo = Monitoreo()
                 fallo, mensaje = monitoreo.activar(json_data)
-                if fallo != 'error' and (vigilancia.fin_vigilancia or len(Monitoreo.objects.filter(tutor_id = json_data['tutor_id'])) == 1):
-                    vigilancia.inicializar()
-                    vigilancia.tutor_id = json_data['tutor_id']
-                    hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
+                if fallo != 'error' and (distaccion.fin_vigilancia or len(Monitoreo.objects.filter(tutor_id = json_data['tutor_id'])) == 1):
+                    distaccion.inicializar()
+                    distaccion.tutor_id = json_data['tutor_id']
+                    hilo_vigilar = threading.Thread(target = distaccion.monitorear)
                     hilo_vigilar.start()
                 return Response({'monitoreo': mensaje})
             except Exception as e: 
@@ -145,9 +145,9 @@ class vwTiposDistraccion(APIView):
         if request.method == 'PUT':
             try:
                 if 'tutor_id' in request.GET:
-                    vigilancia.inicializar()
-                    vigilancia.tutor_id = request.GET['tutor_id']
-                    hilo_vigilar = threading.Thread(target = vigilancia.iniciar)
+                    distaccion.inicializar()
+                    distaccion.tutor_id = request.GET['tutor_id']
+                    hilo_vigilar = threading.Thread(target = distaccion.monitorear)
                     hilo_vigilar.start()
                     return Response({'monitoreo': 'monitoreando.....'})
                 return Response({'monitoreo': 'error'})
@@ -182,6 +182,6 @@ class vwDistraccion(APIView):
     def get(self, request, format = None):
         if request.method == 'GET':
             try:
-                return Response({'distraccion': Monitoreo.existe_distraccion(request)})
+                return Response({'distraccion': Monitoreo.existeDistraccion(request)})
             except Exception as e:
                 return Response({'distraccion': 'error'})

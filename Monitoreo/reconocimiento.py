@@ -1,6 +1,5 @@
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
 from tensorflow.keras.models import Sequential
-from django.core.files.base import ContentFile
 from Persona.models import Supervisados
 from keras.models import load_model
 from urllib.request import urlopen
@@ -11,7 +10,7 @@ import cv2, math, os, time
 import mediapipe as mp
 import numpy as np
 
-class Vigilancia:
+class Distraccion:
     
     def __init__(self):
         self.inicializar()
@@ -142,36 +141,17 @@ class Vigilancia:
         except Exception as e:
             pass
 
-
-    # se registra un historial de la monitorización
-    def guardarHistorial(self, observacion, tipo_distraccion_id, imagen):
-        try:
-            if self.supervisado != '':
-                from .models import Historial, TiposDistraccion
-                self.historial = Historial()
-                self.historial.fecha_hora = datetime.now()
-                self.historial.observacion = observacion
-                self.historial.supervisado = Supervisados.objects.get(pk = self.supervisado)
-                self.historial.tipo_distraccion = TiposDistraccion.objects.get(pk = tipo_distraccion_id)
-                foto_450 = cv2.resize(imagen, (450, 450), interpolation = cv2.INTER_CUBIC)
-                frame_jpg = cv2.imencode('.png', foto_450)
-                file = ContentFile(frame_jpg[1]) 
-                self.historial.imagen_evidencia.save('dis_' + str(tipo_distraccion_id) + '_id_' + str(self.historial.supervisado.persona.id) + '_' + str(self.historial.fecha_hora) + '.png', file, save = True)
-                self.historial.save()
-        except Exception as e:
-            pass
-    
-    def convertir_min_seg(self, segundos):
+    def convertirMinSeg(self, segundos):
         horas = int(segundos / 60 / 60)
         segundos -= horas * 60 * 60
         minutos = int(segundos / 60)
         segundos -= minutos * 60
         return minutos, int(segundos)
 
-    def obtener_rostros(self, imagen):
+    def obtenerRostros(self, imagen):
         return self.clasificador_haar.detectMultiScale(cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY), scaleFactor = 1.3, minNeighbors = 5)
 
-    def distraccion_nino(self, distraido):
+    def cambiarEstado(self, distraido):
         try:
             unSupervisado = Supervisados.objects.get(pk = self.supervisado)
             unSupervisado.distraido = distraido
@@ -179,7 +159,7 @@ class Vigilancia:
         except Exception as e:
             pass
     
-    def iniciar(self):
+    def monitorear(self):
         try:
             camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
             stream = urlopen('http://'+ camara_ip +':81/stream')
@@ -191,6 +171,7 @@ class Vigilancia:
                 if a != -1 and b != -1:
                     imagen = self.byte[a:b + 2]
                     self.byte = self.byte[b + 2:]
+                    # Si se reconoce una imagen
                     if imagen:
                         self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
                         self.video = cv2.resize(self.video, (1490, 760), interpolation = cv2.INTER_CUBIC)
@@ -201,15 +182,15 @@ class Vigilancia:
                         # Copia del video a color para caputurar la imagen que se guardará en el historial
                         video_color = self.video.copy()
                         # Se obtienen todos los rostros del video, se encuentra la cascada haar para dibujar la caja delimitadora alrededor de la cara
-                        rostros = self.obtener_rostros(self.video)
+                        rostros = self.obtenerRostros(self.video)
                         self.reconocer_personas = True if len(Monitoreo.objects.filter(Q(tutor_id = self.tutor_id) & Q(tipo_distraccion_id = self.dis_pers_id))) else False
                         # Si hay un tiempo de inicio que desapareció el supervisado y este no aparece durante el tiempo de espera configurado, se registra el historial
                         self.tiempo_ausente = round(time.time() - self.reloj_supervisado, 0)
-                        if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup)):
+                        if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup) and self.supervisado != ''):
                             self.tiempo_espera_sup += self.incremen_ausente
-                            minutos, segundos = self.convertir_min_seg(self.tiempo_ausente)
-                            self.distraccion_nino(True)
-                            self.guardarHistorial('El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
+                            minutos, segundos = self.convertirMinSeg(self.tiempo_ausente)
+                            self.cambiarEstado(True)
+                            Historial.crear(self.supervisado, 'El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
                         # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
                         self.personas_desconocidas = 0
                         # Recorriendo cada rostro
@@ -238,8 +219,8 @@ class Vigilancia:
                                     if (round(time.time() - self.reloj_desconocido, 0) >= self.tiempo_registro):
                                         self.reloj_desconocido = 0
                                         img_desconocido = video_color[y:y + h, x:x + w]
-                                        if(len(self.obtener_rostros(img_desconocido))):
-                                            self.guardarHistorial('Se identificó una persona desconocida', self.dis_pers_id, img_desconocido)
+                                        if(len(self.obtenerRostros(img_desconocido)) and self.supervisado != ''):
+                                            Historial.crear(self.supervisado, 'Se identificó una persona desconocida', self.dis_pers_id, img_desconocido)
 
 
                             # ------ RECONOCIMIENTO # 2 - Reconocer la expresión facial de la persona
@@ -281,16 +262,16 @@ class Vigilancia:
                                             self.reloj_expresiones = 0
                                             self.expresiones_recono = {}
                                             foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
-                                            if(len(self.obtener_rostros(foto_expresion))):
-                                                self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
+                                            if(len(self.obtenerRostros(foto_expresion)) and self.supervisado != ''):
+                                                Historial.crear(self.supervisado, expresion, self.dis_expre_id, foto_expresion)
                                             self.reloj_expresiones = 0
                                             self.expresiones_recono = {}
                                     else:
                                         self.reloj_expresiones = 0
                                         self.expresiones_recono = {}
                                         foto_expresion = self.imagenes_expresiones.get(self.supervisado, -1).get(expresion, -1)
-                                        if(len(self.obtener_rostros(foto_expresion))):
-                                            self.guardarHistorial(expresion, self.dis_expre_id, foto_expresion)
+                                        if(len(self.obtenerRostros(foto_expresion)) and self.supervisado != ''):
+                                            Historial.crear(self.supervisado, expresion, self.dis_expre_id, foto_expresion)
 
 
                             # ------ RECONOCIMIENTO # 3 - Detectar presencia de sueño en la persona
@@ -330,16 +311,16 @@ class Vigilancia:
                                                     self.parpadeando = False
                                                     self.inicio_sueno = 0
                                                     self.sueno_permitido = self.incremen_sueno_per
-                                                    self.distraccion_nino(False)
+                                                    self.cambiarEstado(False)
                                                 # Temporizador
                                                 if self.inicio_sueno != 0:
                                                     self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
                                                     if self.tiempo_dormido >= self.sueno_permitido:
                                                         self.sueno_permitido += self.incremen_sueno_per
-                                                        if(len(self.obtener_rostros(self.imagen_dormido))):
-                                                            minutos, segundos = self.convertir_min_seg(self.tiempo_dormido)
-                                                            self.distraccion_nino(True)
-                                                            self.guardarHistorial('Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
+                                                        if(len(self.obtenerRostros(self.imagen_dormido)) and self.supervisado != ''):
+                                                            minutos, segundos = self.convertirMinSeg(self.tiempo_dormido)
+                                                            self.cambiarEstado(True)
+                                                            Historial.crear(self.supervisado, 'Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
                                                         
 
 
@@ -391,8 +372,9 @@ class Vigilancia:
                                                     print(str(objeto) + ' - CON PERMISO')
                                                 else:
                                                     print(str(objeto) + ' - SIN PERMISO')
-                                                    # se escoge la imagen del objeto desde el diccionario general de imagenes en array
-                                                    self.guardarHistorial('Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(self.supervisado, -1).get(objeto, -1)))
+                                                    if self.supervisado != '':
+                                                        # se escoge la imagen del objeto desde el diccionario general de imagenes en array
+                                                        Historial.crear(self.supervisado, 'Se identificó el uso del objeto {0} sin autorización'.format(objeto), self.dis_obj_id, (self.imagenes_objetos.get(self.supervisado, -1).get(objeto, -1)))
                                         self.reloj_objetos = 0
                                         self.objetos_recono = {}
                                         self.imagenes_objetos = {}
@@ -411,7 +393,7 @@ class Vigilancia:
                                 # Llegó el supervisado
                                 self.reloj_supervisado = 0
                                 self.tiempo_espera_sup = self.incremen_ausente
-                                self.distraccion_nino(False)
+                                self.cambiarEstado(False)
                             # Mostrar mensaje de presencia / ausencia
                             if self.reloj_supervisado == 0:
                                 cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
