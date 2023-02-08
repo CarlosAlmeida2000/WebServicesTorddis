@@ -20,6 +20,8 @@ class vWvideo(APIView):
                         return StreamingHttpResponse(vWvideo.trans_monitoreo(), content_type="multipart/x-mixed-replace;boundary=frame")
                     elif request.GET['tipo'] == 'entrenamiento':
                         return StreamingHttpResponse(vWvideo.trans_entrena(), content_type="multipart/x-mixed-replace;boundary=frame")
+                elif 'fin_entrenamiento' in request.GET:
+                    return Response({'fin_entrenamiento': entrenar_rostros.fin_entrenamiento}) 
             except Exception as e:
                 return Response({'video': 'error'})
     
@@ -41,12 +43,10 @@ class vWvideo(APIView):
 
 #Mostrar template                
 def streamEntrenamiento(request): 
-        template = "streamEntrenamiento.html"
-        return render(request,template)
+    return render(request, "streamEntrenamiento")
 
 def streamMonitoreo(request): 
-        template = "streamMonitoreo.html"
-        return render(request,template)
+    return render(request, "streamMonitoreo.html")
 
 class vwCamara(APIView):
     def get(self, request, format = None):
