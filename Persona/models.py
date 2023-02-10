@@ -182,3 +182,13 @@ class Supervisados(models.Model):
         except Exception as e: 
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
+
+    @staticmethod
+    def cambiarEstado(supervisado_id, distraido):
+        try:
+            unSupervisado = Supervisados.objects.get(pk = supervisado_id)
+            unSupervisado.distraido = distraido
+            unSupervisado.save()
+            return True
+        except Exception as e:
+            return False

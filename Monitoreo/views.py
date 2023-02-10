@@ -6,10 +6,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 import json, cv2, threading
 from .models import *
+import socket
 
 # Create your views here.
 distaccion = Distraccion()
 entrenar_rostros = EntrenamiFacial()
+host_name = socket.gethostbyname(socket.gethostname())
 
 class vWvideo(APIView):
     def get(self, request, format = None):
@@ -43,10 +45,10 @@ class vWvideo(APIView):
 
 #Mostrar template                
 def streamEntrenamiento(request): 
-    return render(request, "streamEntrenamiento")
+    return render(request, "streamEntrenamiento.html", {'host_name': host_name})
 
 def streamMonitoreo(request): 
-    return render(request, "streamMonitoreo.html")
+    return render(request, "streamMonitoreo.html", {'host_name': host_name})
 
 class vwCamara(APIView):
     def get(self, request, format = None):

@@ -6,6 +6,7 @@ from django.db import transaction
 from Persona.image import Image
 from django.db import models
 import datetime
+from datetime import datetime as dt
 import cv2
 
 # Create your models here.
@@ -249,10 +250,10 @@ class Historial(models.Model):
             return {'historial': 'error'}
     
     @staticmethod
-    def crear(self, supervisado_id, observacion, tipo_distraccion_id, imagen):
+    def crear(supervisado_id, observacion, tipo_distraccion_id, imagen):
         try:
             historial = Historial()
-            historial.fecha_hora = datetime.now()
+            historial.fecha_hora = dt.now()
             historial.observacion = observacion
             historial.supervisado = Supervisados.objects.get(pk = supervisado_id)
             historial.tipo_distraccion = TiposDistraccion.objects.get(pk = tipo_distraccion_id)
@@ -263,6 +264,7 @@ class Historial(models.Model):
             historial.save()
             return True
         except Exception as e:
+            print(str)
             return False
 
     @staticmethod

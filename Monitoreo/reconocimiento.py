@@ -5,7 +5,6 @@ from keras.models import load_model
 from urllib.request import urlopen
 from django.db.models import Q
 from Monitoreo.models import *
-from datetime import datetime
 import cv2, math, os, time
 import mediapipe as mp
 import numpy as np
@@ -150,14 +149,6 @@ class Distraccion:
 
     def obtenerRostros(self, imagen):
         return self.clasificador_haar.detectMultiScale(cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY), scaleFactor = 1.3, minNeighbors = 5)
-
-    def cambiarEstado(self, distraido):
-        try:
-            unSupervisado = Supervisados.objects.get(pk = self.supervisado)
-            unSupervisado.distraido = distraido
-            unSupervisado.save()
-        except Exception as e:
-            pass
     
     def monitorear(self):
         try:
@@ -166,11 +157,11 @@ class Distraccion:
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
                 self.fin_vigilancia = False
                 self.byte += stream.read(4096)
-                a = self.byte.find(b'\xff\xd8')
-                b = self.byte.find(b'\xff\xd9')
-                if a != -1 and b != -1:
-                    imagen = self.byte[a:b + 2]
-                    self.byte = self.byte[b + 2:]
+                alto_imagen = self.byte.find(b'\xff\xd8')
+                ancho_imagen = self.byte.find(b'\xff\xd9')
+                if alto_imagen != -1 and ancho_imagen != -1:
+                    imagen = self.byte[alto_imagen:ancho_imagen + 2]
+                    self.byte = self.byte[ancho_imagen + 2:]
                     # Si se reconoce una imagen
                     if imagen:
                         self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
@@ -189,7 +180,7 @@ class Distraccion:
                         if (self.reconocer_personas and self.reloj_supervisado > 0 and (self.tiempo_ausente >= self.tiempo_espera_sup) and self.supervisado != ''):
                             self.tiempo_espera_sup += self.incremen_ausente
                             minutos, segundos = self.convertirMinSeg(self.tiempo_ausente)
-                            self.cambiarEstado(True)
+                            Supervisados.cambiarEstado(self.supervisado, True)
                             Historial.crear(self.supervisado, 'El niño(a) lleva un tiempo de {0} minutos ausente del área de estudio'.format(minutos), self.dis_pers_id, video_color)
                         # Se reinicia el conteo de personas desconocidas, porque se obtienen nuevos rostros
                         self.personas_desconocidas = 0
@@ -201,7 +192,7 @@ class Distraccion:
                             # ------ RECONOCIMIENTO # 1 - Identificador de identidad de las personas, se realiza el reconocimiento facial para verificar si es una persona registrada
                             rostro_150 = cv2.resize(rostro, (150, 150), interpolation = cv2.INTER_CUBIC)
                             self.persona_identif = self.reconocedor_facial.predict(rostro_150)
-                            if self.persona_identif[1] < 70:
+                            if self.persona_identif[1] < 70 and len(self.lista_supervisados):
                                 # Si es una persona registrada, se procede a realizar los otros tipos de reconocimiento
                                 self.supervisado = self.lista_supervisados[self.persona_identif[0]]
                                 self.es_desconocido = False
@@ -311,7 +302,7 @@ class Distraccion:
                                                     self.parpadeando = False
                                                     self.inicio_sueno = 0
                                                     self.sueno_permitido = self.incremen_sueno_per
-                                                    self.cambiarEstado(False)
+                                                    Supervisados.cambiarEstado(self.supervisado, False)
                                                 # Temporizador
                                                 if self.inicio_sueno != 0:
                                                     self.tiempo_dormido = round(time.time() - self.inicio_sueno, 0)
@@ -319,7 +310,7 @@ class Distraccion:
                                                         self.sueno_permitido += self.incremen_sueno_per
                                                         if(len(self.obtenerRostros(self.imagen_dormido)) and self.supervisado != ''):
                                                             minutos, segundos = self.convertirMinSeg(self.tiempo_dormido)
-                                                            self.cambiarEstado(True)
+                                                            Supervisados.cambiarEstado(self.supervisado, True)
                                                             Historial.crear(self.supervisado, 'Presencia de sueño, lleva dormido un tiempo de {0} minutos y {1} segundos'.format(minutos, segundos), self.dis_suen_id, self.imagen_dormido)
                                                         
 
@@ -393,7 +384,7 @@ class Distraccion:
                                 # Llegó el supervisado
                                 self.reloj_supervisado = 0
                                 self.tiempo_espera_sup = self.incremen_ausente
-                                self.cambiarEstado(False)
+                                Supervisados.cambiarEstado(self.supervisado, False)
                             # Mostrar mensaje de presencia / ausencia
                             if self.reloj_supervisado == 0:
                                 cv2.putText(self.video, 'Presente', (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)

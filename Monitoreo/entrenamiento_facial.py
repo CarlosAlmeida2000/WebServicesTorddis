@@ -20,7 +20,7 @@ class EntrenamiFacial:
         self.datos_rostros = []
         self.cont_etiquetas = 0
         self.clasificador_haar = cv2.CascadeClassifier('Monitoreo\\modelos_entrenados\\haarcascade_frontalface_default.xml')
-        self.imagenes_capturar = 100
+        self.imagenes_capturar = 200
         self.cont_imagenes = 0
         self.fin_entrenamiento = False
         self.byte = bytes()
@@ -31,33 +31,34 @@ class EntrenamiFacial:
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk), exist_ok = True)
             camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
             stream = urlopen('http://'+ camara_ip +':81/stream')
-            while True:
+            
+            while self.cont_imagenes < self.imagenes_capturar:
                 self.byte += stream.read(4096)
-                a = self.byte.find(b'\xff\xd8')
-                b = self.byte.find(b'\xff\xd9')
-                if a != -1 and b != -1:
-                    imagen = self.byte[a:b + 2]
-                    self.byte = self.byte[b + 2:]
+                alto_imagen = self.byte.find(b'\xff\xd8')
+                ancho_imagen = self.byte.find(b'\xff\xd9')
+                if alto_imagen != -1 and ancho_imagen != -1:
+                    imagen = self.byte[alto_imagen:ancho_imagen + 2]
+                    self.byte = self.byte[ancho_imagen + 2:]
                     if imagen:
                         self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
                         self.video = cv2.resize(self.video, (1490, 760), interpolation = cv2.INTER_CUBIC)
                         gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                         auxFrame = self.video.copy()
                         rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
-                        cv2.putText(self.video, 'Capturando {0} fotos de 100'.format((self.cont_imagenes + 1)), 
+                        cv2.putText(self.video, 'Capturando {0} fotos de {1}'.format((self.cont_imagenes + 1), self.imagenes_capturar), 
                         (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                         for (x, y, w, h) in rostros:
                             cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
-                            rostro = auxFrame[y:y + h, x:x + w]
-                            rostro = cv2.resize(rostro,(150, 150),interpolation = cv2.INTER_CUBIC)
+                            rostro = cv2.resize(auxFrame[y:y + h, x:x + w],(150, 150),interpolation = cv2.INTER_CUBIC)
                             cv2.imwrite(self.ruta_rostros + '\\' + str(self.supervisado.pk) + '/rotro_{}.png'
                             .format(self.cont_imagenes), rostro)
                             self.cont_imagenes += 1
                         cv2.imshow('Video', self.video)
                         k =  cv2.waitKey(1)
-                        if k == 27 or self.cont_imagenes >= self.imagenes_capturar:
+                        if k == 27:
                             cv2.destroyAllWindows()
                             break
+            cv2.destroyAllWindows()
             # entrenamiento del modelo con todas las imágenes
             lista_personas = os.listdir(self.ruta_rostros)
             for persona in lista_personas:
