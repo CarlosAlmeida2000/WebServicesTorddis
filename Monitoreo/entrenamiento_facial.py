@@ -23,6 +23,7 @@ class EntrenamiFacial:
         self.imagenes_capturar = 200
         self.cont_imagenes = 0
         self.fin_entrenamiento = False
+        self.estado = ''
         self.byte = bytes()
 
     def entrenar(self):
@@ -31,7 +32,6 @@ class EntrenamiFacial:
             os.makedirs(self.ruta_rostros + '\\' + str(self.supervisado.pk), exist_ok = True)
             camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
             stream = urlopen('http://'+ camara_ip +':81/stream')
-            
             while self.cont_imagenes < self.imagenes_capturar:
                 self.byte += stream.read(4096)
                 alto_imagen = self.byte.find(b'\xff\xd8')
@@ -45,7 +45,8 @@ class EntrenamiFacial:
                         gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                         auxFrame = self.video.copy()
                         rostros = self.clasificador_haar.detectMultiScale(gray, 1.3, 5)
-                        cv2.putText(self.video, 'Capturando {0} fotos de {1}'.format((self.cont_imagenes + 1), self.imagenes_capturar), 
+                        self.estado = '{0} fotos de {1}'.format((self.cont_imagenes + 1), self.imagenes_capturar)
+                        cv2.putText(self.video, self.estado, 
                         (20, 28), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
                         for (x, y, w, h) in rostros:
                             cv2.rectangle(self.video, (x, y),(x + w, y + h),(0, 255, 0), 2)
@@ -56,9 +57,9 @@ class EntrenamiFacial:
                         cv2.imshow('Video', self.video)
                         k =  cv2.waitKey(1)
                         if k == 27:
-                            cv2.destroyAllWindows()
                             break
             cv2.destroyAllWindows()
+            self.fin_entrenamiento = True
             # entrenamiento del modelo con todas las imágenes
             lista_personas = os.listdir(self.ruta_rostros)
             for persona in lista_personas:
@@ -71,7 +72,6 @@ class EntrenamiFacial:
             reconocedor_facial.train(self.datos_rostros, np.array(self.etiquetas)) 
             reconocedor_facial.write(self.ruta_modelos + 'reconocedor_facial.xml')
             print("Modelo de reconocimiento facial almacenado...")
-            self.fin_entrenamiento = True
             return 'entrenado'
         except Camaras.DoesNotExist or Supervisados.DoesNotExist:
             return 'camara no encontrada'

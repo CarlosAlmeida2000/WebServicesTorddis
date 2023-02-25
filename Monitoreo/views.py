@@ -22,8 +22,8 @@ class vWvideo(APIView):
                         return StreamingHttpResponse(vWvideo.trans_monitoreo(), content_type="multipart/x-mixed-replace;boundary=frame")
                     elif request.GET['tipo'] == 'entrenamiento':
                         return StreamingHttpResponse(vWvideo.trans_entrena(), content_type="multipart/x-mixed-replace;boundary=frame")
-                elif 'fin_entrenamiento' in request.GET:
-                    return Response({'fin_entrenamiento': entrenar_rostros.fin_entrenamiento}) 
+                elif 'estado_entrenamiento' in request.GET:
+                    return Response({'fin_entrenamiento': entrenar_rostros.fin_entrenamiento, 'estado': entrenar_rostros.estado}) 
             except Exception as e:
                 return Response({'video': 'error'})
     
