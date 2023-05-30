@@ -186,4 +186,4 @@ class vwDistraccion(APIView):
             try:
                 return Response({'distraccion': Monitoreo.existeDistraccion(request)})
             except Exception as e:
-                return Response({'distraccion': 'error'})
+                return Response({'distraccion': False})

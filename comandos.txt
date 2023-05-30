@@ -1,0 +1,13 @@
+# Comando para habilitar los Buffers de python donde se utilizará al trabajar con Protocol Buffers, un mecanismo de serialización de datos desarrollado por Google
+set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
+# Crear cuenta de super usuario
+python manage.py createsuperuser
+ usuario: carlos 
+ clave: 123456
+
+# Instalar los requerimientos  
+ pip install -r requirements.txt
+
+# Insertar los fixtures de datos en los modelos  
+python manage.py loaddata <nombre_del_fixture>.json

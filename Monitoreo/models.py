@@ -196,9 +196,9 @@ class Monitoreo(models.Model):
                 if Supervisados.objects.filter(Q(tutor_id = Camaras.objects.filter(direccion_ruta = request.GET['direccion_ruta'])[0].tutor.id) & Q(distraido = True)).count() > 0:
                     return True
                 return False
-            return 'error'
+            return False
         except Exception as e: 
-            return 'error'
+            return False
 
 
 class Historial(models.Model):
@@ -264,7 +264,7 @@ class Historial(models.Model):
             historial.save()
             return True
         except Exception as e:
-            print(str)
+            print('Error en historial: ' + str(e))
             return False
 
     @staticmethod
