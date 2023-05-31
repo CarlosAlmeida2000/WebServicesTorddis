@@ -128,14 +128,14 @@ class Distraccion:
 
             # ------ RECONOCIMIENTO # 4 - Reconocer objetos                
             # Cargar el modelo
-            self.modelo_objetos = load_model(self.ruta_modelos + 'keras_model.h5')
+            self.modelo_objetos = load_model(self.ruta_modelos + 'keras_model2.h5')
             # Crear el array de la forma adecuada para alimentar el modelo keras con las imágenes de 224 x 244 pixeles
             self.data_entrena_objet = np.ndarray(shape = (1, 224, 224, 3), dtype = np.float32)
             self.objetos_recono = {}
             self.imagenes_objetos = {}
             # Cargar las clases de objetos
             self.labels_objetos = list()
-            for i in open(self.ruta_modelos + 'labels.txt', 'r', encoding='utf8'): 
+            for i in open(self.ruta_modelos + 'labels2.txt', 'r', encoding='utf8'): 
                 self.labels_objetos.append(i.split()[1])
         except Exception as e:
             pass
@@ -152,10 +152,15 @@ class Distraccion:
     
     def monitorear(self):
         try:
+            # ***** Código para usar la CAMARA del dispositivo
             camara_ip = Camaras.objects.get(tutor_id = self.tutor_id).direccion_ruta
             stream = urlopen('http://'+ camara_ip +':81/stream')
+            # ***** fin
             while len(Monitoreo.objects.filter(tutor_id = self.tutor_id)):
+                
                 self.fin_vigilancia = False
+
+                # ***** Código para usar la CAMARA del dispositivo
                 self.byte += stream.read(4096)
                 alto_imagen = self.byte.find(b'\xff\xd8')
                 ancho_imagen = self.byte.find(b'\xff\xd9')
@@ -164,8 +169,26 @@ class Distraccion:
                     self.byte = self.byte[ancho_imagen + 2:]
                     # Si se reconoce una imagen
                     if imagen:
+                # ***** fin
+
+                # ***** Código para usar CAMARA WEB
+                # cap = cv2.VideoCapture(0)
+                # while True:
+                #     # Find haar cascade to draw bounding box around face
+                #     ret, imagen = cap.read()
+                #     if not ret:
+                #         break
+                # ***** fin
+                
+                        # ***** Código para usar la CAMARA del dispositivo
                         self.video = cv2.imdecode(np.fromstring(imagen, dtype = np.uint8), cv2.IMREAD_COLOR)
                         self.video = cv2.resize(self.video, (1490, 760), interpolation = cv2.INTER_CUBIC)
+                        # ***** fin
+
+                        # ***** Código para usar CAMARA WEB
+                        #self.video = cv2.resize(imagen, (1490, 760), interpolation = cv2.INTER_CUBIC)
+                        # ***** fin
+
                         # Convierte el video en escala de grises para reconocimiento de identididad y de expresiones facial
                         gray = cv2.cvtColor(self.video, cv2.COLOR_BGR2GRAY)
                         # Correción de color para la malla facial que reconoce la presencia de sueño y el reconocimiento de objetos
@@ -352,9 +375,9 @@ class Distraccion:
                                             self.objetos_recono = {self.supervisado: {nombre_objeto: 1}}
                                 # Después de estar analizando durante 30 segundos se registran los objetos con número mayor de 5 manifestaciones 
                                 print(self.objetos_recono)
-                                if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.tiempo_registro)):
+                                if (round(time.time() - (self.reloj_objetos + 2), 0) >= (self.incremen_sueno_per)):
                                     lista_objetos = self.objetos_recono.get(self.supervisado, None)
-                                    if len(lista_objetos) > 0:
+                                    if lista_objetos != None:
                                         for objeto in lista_objetos:
                                             # Si tiene la probabilidad de más de 5 apariciones el objeto, se procede a verificar el permiso de uso
                                             if self.objetos_recono.get(self.supervisado).get(objeto) > 5:
@@ -403,6 +426,6 @@ class Distraccion:
         except Supervisados.DoesNotExist:
             pass
         except Exception as e: 
-            print('Error durante el monitoreo: ' ,str(e))
+            print('Error durante el monitoreo: ' + str(e))
             self.fin_vigilancia = True
         return 0

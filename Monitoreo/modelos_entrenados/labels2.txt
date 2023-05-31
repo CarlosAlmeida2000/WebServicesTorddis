@@ -1,0 +1,7 @@
+0 Borrador
+1 Botella
+2 Celular
+3 Mochila
+4 Sacapunta
+5 Tijera
+6 Vaso

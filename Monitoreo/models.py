@@ -42,7 +42,7 @@ class Camaras(models.Model):
             if(len(tiene_camara)) and not tiene_camara[0].pk == self.pk:
                 return 'El tutor ya tiene una cámara'    
             self.save()
-            return 'guardada'
+            return 'Dispositivo guardado'
         except Tutores.DoesNotExist:
             transaction.savepoint_rollback(punto_guardado)
             return 'error'
@@ -163,7 +163,7 @@ class Monitoreo(models.Model):
                     self.tutor = Tutores.objects.get(pk = json_data['tutor_id'])
                     self.tipo_distraccion = TiposDistraccion.objects.get(pk = json_data['tipo_dist_id'])
                     self.save()
-                    return '', 'activado'
+                    return '', 'Parámetro activado'
                 else:
                     return 'error', 'el tipo de distracción ya está activado'
             return 'error', 'error'
@@ -182,7 +182,7 @@ class Monitoreo(models.Model):
         try:
             monitoreo = Monitoreo.objects.get(Q(tutor_id = request.GET['tutor_id']) & Q(tipo_distraccion_id = request.GET['tipo_dist_id']))
             monitoreo.delete()
-            return 'desactivado'
+            return 'Parámetro desactivado'
         except Monitoreo.DoesNotExist:
             return 'el tipo de distracción no está activado'
         except Exception as e: 
